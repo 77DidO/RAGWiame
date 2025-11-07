@@ -12,10 +12,18 @@ Plateforme RAG open source orientée francophonie. Ce dépôt fournit un starter
 
 ## Prise en main rapide
 
+### Linux / macOS (Bash)
+
 ```bash
-chmod +x scripts/bootstrap.sh
-./scripts/bootstrap.sh
-python scripts/deploy.py
+python scripts/start.py
 ```
 
-Consultez `docs/deploiement.md` pour la configuration avancée et `docs/architecture.md` pour la vue d'ensemble.
+### Windows (PowerShell)
+
+```powershell
+python scripts/start.py
+```
+
+Utilisez `--skip-bootstrap` ou `--skip-deploy` pour exécuter sélectivement les étapes.
+
+Consultez `docs/deploiement.md` pour la configuration avancée, `docs/demarrage_automatique.md` pour le détail du script et `docs/architecture.md` pour la vue d'ensemble.
