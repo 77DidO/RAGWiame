@@ -1,0 +1,123 @@
+version: "3.9"
+
+services:
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: exemple_root
+      MARIADB_DATABASE: rag
+      MARIADB_USER: rag_user
+      MARIADB_PASSWORD: changeme
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - rag-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_RELATIVE_PATH: /
+    volumes:
+      - ./keycloak/realm-export:/opt/keycloak/data/import
+    networks:
+      - rag-net
+    depends_on:
+      - mariadb
+
+  qdrant:
+    image: qdrant/qdrant:1.8.2
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - rag-net
+
+  vllm:
+    build:
+      context: ../llm_pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      VLLM_MODEL_NAME: mistralai/Mistral-7B-Instruct-v0.3
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+    networks:
+      - rag-net
+    depends_on:
+      - qdrant
+
+  ingestion:
+    build:
+      context: ../ingestion
+      dockerfile: Dockerfile
+    environment:
+      MARIADB_PASSWORD: changeme
+    volumes:
+      - ../data/examples:/data:ro
+    networks:
+      - rag-net
+    depends_on:
+      - mariadb
+      - qdrant
+
+  indexation:
+    build:
+      context: ../indexation
+      dockerfile: Dockerfile
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    networks:
+      - rag-net
+    depends_on:
+      - ingestion
+      - qdrant
+
+  gateway:
+    build:
+      context: ../llm_pipeline
+      dockerfile: Dockerfile
+    command: ["python", "-m", "llm_pipeline.api"]
+    environment:
+      VLLM_ENDPOINT: http://vllm:8000/v1
+      QDRANT_URL: http://qdrant:6333
+      KEYCLOAK_URL: http://keycloak:8080/
+    networks:
+      - rag-net
+    depends_on:
+      - vllm
+      - qdrant
+      - keycloak
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    ports:
+      - "8080:8080"
+    environment:
+      OAUTH_PROVIDER: keycloak
+      OAUTH_CLIENT_ID: rag-webui
+      OAUTH_CLIENT_SECRET: change-me
+      OAUTH_AUTH_URL: http://keycloak:8080/realms/rag/protocol/openid-connect/auth
+      OAUTH_TOKEN_URL: http://keycloak:8080/realms/rag/protocol/openid-connect/token
+      API_BASE_URL: http://gateway:8081
+    networks:
+      - rag-net
+    depends_on:
+      - gateway
+      - keycloak
+
+volumes:
+  mariadb_data:
+  qdrant_data:
+
+networks:
+  rag-net:
+    driver: bridge

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+*.log
+data/examples/*
+!data/examples/README.md
+.idea/
+.vscode/
+.DS_Store
