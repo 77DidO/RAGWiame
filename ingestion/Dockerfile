@@ -1,10 +1,20 @@
 FROM python:3.11-slim
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
 WORKDIR /app
 
-COPY requirements.txt ./
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        pkg-config \
+        libmariadb-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-COPY . ./
+COPY . /app/ingestion
 
-ENTRYPOINT ["python", "-m", "ingestion.cli", "run"]
+ENTRYPOINT ["python", "-m", "ingestion.cli"]

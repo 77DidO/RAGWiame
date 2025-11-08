@@ -1,11 +1,14 @@
 FROM python:3.11-slim
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
 WORKDIR /app
 
-COPY requirements.txt ./
+COPY requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-COPY . ./
+COPY . /app/llm_pipeline
 
 EXPOSE 8081
 

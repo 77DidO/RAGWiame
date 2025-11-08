@@ -10,11 +10,8 @@ import typer
 from ingestion.config import DEFAULT_CONFIG, IngestionConfig
 from ingestion.pipeline import IngestionPipeline
 
-app = typer.Typer(help="Outils d'ingestion RAG")
 
-
-@app.command()
-def run(config_path: Optional[Path] = typer.Option(None, help="Chemin du fichier de configuration")) -> None:
+def main(config_path: Optional[Path] = typer.Option(None, help="Chemin du fichier de configuration")) -> None:
     """Exécute la pipeline d'ingestion et renvoie les chunks JSON."""
 
     config = DEFAULT_CONFIG
@@ -22,7 +19,13 @@ def run(config_path: Optional[Path] = typer.Option(None, help="Chemin du fichier
         config = _load_config(config_path)
     pipeline = IngestionPipeline(config)
     chunks = [chunk for chunk in pipeline.run()]
-    typer.echo(json.dumps([{"id": c.id, "text": c.text, "metadata": dict(c.metadata)} for c in chunks], ensure_ascii=False, indent=2))
+    typer.echo(
+        json.dumps(
+            [{"id": c.id, "text": c.text, "metadata": dict(c.metadata)} for c in chunks],
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 def _load_config(path: Path) -> IngestionConfig:
@@ -31,4 +34,4 @@ def _load_config(path: Path) -> IngestionConfig:
 
 
 if __name__ == "__main__":
-    app()
+    typer.run(main)
