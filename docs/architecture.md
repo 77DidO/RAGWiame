@@ -1,40 +1,97 @@
-# Architecture de référence
+# Architecture fonctionnelle et technique
 
-## Vue d'ensemble
+## 1. Vue globale
 
-La plateforme RAGWiame repose sur une architecture modulaire entièrement open source.
+```
+┌──────────┐    HTTP (Keycloak/OIDC)    ┌──────────┐    gRPC HTTP  ┌───────┐
+│ Utilisat│───► Open WebUI ───────────►│ Gateway  │──────────────►│ vLLM  │
+└──────────┘                           │ FastAPI  │               └───────┘
+                                          │  ▲
+                                          │  │
+                                    Qdrant │  │ RAG
+                                          ▼  │
+                                   ┌────────────┐
+                                   │ VectorStore│
+                                   └────────────┘
+                                          ▲
+              Fichiers / SQL              │ Embeddings
+   ┌──────────────┐   docker compose run  │
+   │ Upload UI    │───────────────────────┤
+   ├──────────────┤                       │
+   │ ingestion    │────► Chunking         │
+   │ indexation   │────► Sentence-BERT ───┘
+```
 
-- **Ingestion** : connecteurs TXT, DOCX, PDF, Excel et MariaDB pour produire des chunks normalisés.
-- **Indexation** : LlamaIndex orchestre l'encodage via un modèle Sentence-BERT et stocke les vecteurs dans Qdrant.
-- **Pipeline LLM** : vLLM sert Mistral 7B Instruct et expose une API compatible OpenAI pour la génération en français.
-- **Front-end** : Open WebUI fournit l'interface utilisateur, authentifiée par Keycloak.
-- **Sécurité** : Keycloak gère les rôles et services, appliqués dans les filtres Qdrant et auditables via l'API.
+Deux flux principaux :
 
-## Flux principal
+1. **Ingestion / indexation** : import des documents, découpe, génération des vecteurs (Sentence-BERT multilingue) puis stockage dans Qdrant.
+2. **Question / réponse** : Open WebUI (ou n’importe quel client OpenAI) appelle la Gateway FastAPI qui interroge Qdrant via LlamaIndex, puis délègue la génération à vLLM/Mistral.
 
-1. Les documents sont chargés via la CLI d'ingestion ou une API. Les métadonnées (service, rôle, confidentialité) sont enrichies.
-2. Les chunks sont envoyés au service d'indexation qui crée ou met à jour les collections Qdrant.
-3. Lors d'une requête, le pipeline RAG récupère les chunks pertinents filtrés par droits, construit un prompt français et interroge Mistral 7B.
-4. L'API renvoie la réponse accompagnée des citations et des métadonnées utiles pour l'audit.
+## 2. Pile technologique
 
-## Composants
+| Couche | Technologies | Conteneur | Rôle | Interfaces exposées |
+| --- | --- | --- | --- | --- |
+| Interface utilisateur | Open WebUI (Next.js + FastAPI) | `openwebui` | Chat, gestion des conversations, paramétrage des presets | HTTP 8080 (protégé par Keycloak) |
+| Authentification | Keycloak 24 | `keycloak` | Realm `rag`, clients OpenID Connect, mapping des rôles vers `service/role` | OIDC 8080/8443 |
+| Orchestration RAG | FastAPI + LlamaIndex + Qdrant Client | `gateway` | Endpoints `/rag/query`, `/v1/chat/completions`, filtrage service/role, transformation OpenAI ↔ pipeline | HTTP 8081 |
+| Modèle de langage | vLLM 0.6 + PyTorch + CUDA | `vllm` | Sert `mistralai/Mistral-7B-Instruct-v0.3` (API OpenAI) | HTTP 8000 |
+| Stockage vectoriel | Qdrant 1.9 | `qdrant` | Collection `rag_documents`, filtrage vectoriel + métadonnées | HTTP 6333 |
+| Pipelines données | Scripts Python LlamaIndex | `ingestion`, `indexation` | Nettoyage, chunking, embedding, envoi dans Qdrant | Jobs `docker compose run` |
+| Interface import | FastAPI (upload_ui) | hors compose | Téléversement local, copie vers `data/examples`, déclenchement ingestion/indexation | HTTP 8001 |
+| Base relationnelle | MariaDB 11 | `mariadb` | Source optionnelle pour ingestion SQL (non obligatoire) | 3306 |
 
-| Composant | Langage | Conteneur | Description |
-|-----------|---------|-----------|-------------|
-| ingestion | Python 3.11 | `ingestion` | Connecteurs fichiers et SI, chunking configurable |
-| indexation | Python 3.11 | `indexation` | Interaction LlamaIndex/Qdrant |
-| llm_pipeline | Python 3.11 | `gateway` & `vllm` | API FastAPI et serveur vLLM |
-| openwebui | TypeScript | `openwebui` | Interface conversationnelle |
-| keycloak | Java | `keycloak` | Gestion des identités et rôles |
-| mariadb | SQL | `mariadb` | Métadonnées et données de référence |
+## 3. Flux détaillés
 
-## Données
+### 3.1 Ingestion / indexation
 
-- **Brutes** : stockées sur disque monté en lecture seule pour ingestion.
-- **Vectorielles** : Qdrant avec réplication possible.
-- **Métadonnées** : MariaDB, synchronisées avec Keycloak pour les droits.
+1. **Source** : documents déposés manuellement dans `data/examples/` ou via l’Upload UI.
+2. **Job `ingestion`** :
+   - Lecture de chaque fichier.
+   - Normalisation (UTF-8, suppression artefacts).
+   - Extraction des métadonnées : `source`, `service`, `role`, `confidentialité`, etc.
+   - Enregistrement des chunks intermédiaires.
+3. **Job `indexation`** :
+   - Chargement des chunks en mémoire.
+   - Embedding via `sentence-transformers/distiluse-base-multilingual-cased-v2`.
+   - Écriture dans Qdrant (`vectors` + `payload`).
+4. **Qdrant** : la collection conserve les IDs, vecteurs et metadata, permettant :
+   - Filtrage par `service/role`.
+   - Suppression ciblée (via `points/delete`).
 
-## Observabilité
+### 3.2 Chaîne de question / réponse
 
-- Exporters Prometheus/Grafana (à compléter) pour les services.
-- Journaux centralisés via EFK/ELK (points d'intégration prévus dans la compose).
+1. L’utilisateur se connecte sur Open WebUI (SSO Keycloak). Toutes les requêtes incluent le token OIDC.
+2. Open WebUI relaie la requête vers la Gateway (profil RAG) via `/v1/chat/completions`.
+3. La Gateway :
+   - Valide le token (sauf `BYPASS_AUTH=true`).
+   - Transforme la requête en `QueryPayload`.
+   - Récupère les chunks pertinents via `VectorStoreIndex.as_retriever(similarity_top_k=6, filters=MetadataFilters)`.
+   - Compose le prompt final et appelle vLLM avec `OpenAILike`.
+4. vLLM génère la réponse en streaming et renvoie le texte.
+5. La Gateway enrichit la réponse (`citations`, `metadata`) avant de la retourner à Open WebUI ou au client OpenAI.
+
+## 4. Intégration avec Open WebUI
+
+- Open WebUI est configuré pour utiliser l’endpoint `http://gateway:8081/v1/chat/completions`.
+- Chaque espace ou preset peut pointer soit vers le mode **RAG** (Gateway), soit vers **Mistral pur** en ciblant `http://vllm:8000/v1`.
+- Les droits utilisateurs sont gérés côté Keycloak : le token OIDC inclut les rôles, et la Gateway peut mapper ces rôles vers les filtres `service/role`.
+- Il est possible d’ajouter un second preset “Mistral direct” pour les questions hors référentiel, sans impacter le flux RAG.
+
+## 5. Maintenance et observabilité
+
+- `docker compose ps` / `logs` pour vérifier chaque service.
+- Qdrant fournit `/collections`, `/points/count`, `/snapshots` pour auditer le référentiel.
+- vLLM expose ses métriques GPU dans les logs (`vllm.log`), utile pour ajuster `max_seq_len`, `tensor_parallel_size`.
+- Les variables clés sont centralisées dans `infra/docker-compose.yml` (ex : `VLLM_ENDPOINT`, `DEFAULT_RAG_SERVICE`, `HF_EMBEDDING_MODEL`).
+- Pour automatiser la supervision, branchez Prometheus/Grafana via les endpoints HTTP existants (non fournis par défaut mais supportés).
+
+## 6. Résumé d’imbriquement
+
+- **Open WebUI** sert d’interface et consomme la Gateway comme un backend OpenAI.
+- **Gateway FastAPI** agit comme chef d’orchestre : elle parle à Qdrant via LlamaIndex, puis à vLLM pour générer la réponse.
+- **vLLM** encapsule Mistral et fournit les capacités de génération haute performance.
+- **Qdrant** conserve la mémoire vectorielle, alimentée par **ingestion/indexation**.
+- **Upload UI** et scripts CLI constituent la porte d’entrée des données.
+- **Keycloak** garantit que seuls les utilisateurs autorisés accèdent aux fonctionnalités en propulsant l’authentification centralisée.
+
+Cette séparation permet de remplacer une couche sans affecter le reste (ex : changer Qdrant pour Milvus, ou vLLM pour une autre implémentation OpenAI-compatible) tant que les contrats d’API sont respectés.
