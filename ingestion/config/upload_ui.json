@@ -1,0 +1,35 @@
+{
+  "txt": {
+    "enabled": true,
+    "paths": ["/data"],
+    "recursive": true
+  },
+  "docx": {
+    "enabled": true,
+    "paths": ["/data"],
+    "recursive": true
+  },
+  "pdf": {
+    "enabled": true,
+    "paths": ["/data"],
+    "recursive": true
+  },
+  "excel": {
+    "enabled": true,
+    "paths": ["/data"],
+    "recursive": true
+  },
+  "excel_options": {
+    "load_formulas": true,
+    "max_rows": null,
+    "max_columns": null,
+    "sheet_whitelist": null
+  },
+  "mariadb_source": {
+    "enabled": false,
+    "paths": []
+  },
+  "chunk_size": 1024,
+  "chunk_overlap": 80,
+  "language": "fr"
+}

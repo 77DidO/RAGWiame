@@ -19,7 +19,11 @@ EXAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="RAGWiame - Upload documents")
 
 
-def _run_compose_service(service: str) -> subprocess.CompletedProcess[str]:
+def _run_compose_service(
+    service: str,
+    compose_args: List[str] | None = None,
+    service_args: List[str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Exécute un service via docker compose."""
     cmd = [
         "docker",
@@ -28,9 +32,20 @@ def _run_compose_service(service: str) -> subprocess.CompletedProcess[str]:
         str(REPO_ROOT / "infra" / "docker-compose.yml"),
         "run",
         "--rm",
-        service,
     ]
-    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if compose_args:
+        cmd.extend(compose_args)
+    cmd.append(service)
+    if service_args:
+        cmd.extend(service_args)
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+        check=False,
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -58,17 +73,16 @@ async def handle_upload(
         destination.write_bytes(data)
         saved.append(up.filename)
 
+    msg = f"Upload: {', '.join(saved)}"
     if trigger:
         loop = asyncio.get_event_loop()
-        ingestion = await loop.run_in_executor(None, _run_compose_service, "ingestion")
-        indexation = await loop.run_in_executor(None, _run_compose_service, "indexation")
-        msg = (
-            f"Upload: {', '.join(saved)}<br>"
-            f"Ingestion exit code: {ingestion.returncode}<br>"
-            f"Indexation exit code: {indexation.returncode}"
+        indexation = await loop.run_in_executor(
+            None,
+            _run_compose_service,
+            "indexation",
+            ["-e", "INGESTION_CONFIG_PATH=/app/ingestion/config/upload_ui.json"],
         )
-    else:
-        msg = f"Upload: {', '.join(saved)}"
+        msg = f"{msg}<br>Indexation exit code: {indexation.returncode}"
 
     return HTMLResponse(
         f"<p>{msg}</p><p><a href='/'>Retour</a></p>",

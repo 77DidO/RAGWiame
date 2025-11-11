@@ -14,6 +14,14 @@ Qdrant (rag_documents)        -> stocke les vecteurs + métadonnées service/rol
 
 Formats pris en charge : TXT, PDF, DOCX, PPTX, XLSX (via LlamaIndex) et tables MariaDB configurées dans `ingestion/config`. Chaque chunk reçoit automatiquement les champs `source`, `chunk_index`, `service`, `role`, `ingested_at`.
 
+### Découpage et nettoyage automatiques
+
+- Les PDF/DOCX sont d'abord extraits page par page, puis re-segmentés en morceaux d'environ `chunk_size` caractères (1024 par défaut) avec un chevauchement `chunk_overlap` de 80 caractères.
+- Les étiquettes internes du type `Question : ...` / `Réponse : ...` sont supprimées pendant le nettoyage, ce qui évite que le modèle confonde la FAQ interne avec la question de l'utilisateur.
+- Chaque segment hérite du `source` original et d'un identifiant `chunk_index`.
+
+Vous pouvez ajuster ces valeurs dans `ingestion/config.py` ou dans un fichier JSON personnalisé (champ `chunk_size` / `chunk_overlap`).
+
 ## 2. Préparer les documents
 
 1. Copier les fichiers à ingérer dans `data/examples/`.

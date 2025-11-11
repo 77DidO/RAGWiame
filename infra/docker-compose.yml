@@ -26,7 +26,7 @@ services:
       - mariadb
 
   qdrant:
-    image: qdrant/qdrant:v1.9.2
+    image: qdrant/qdrant:v1.15.1
     ports:
       - "6333:6333"
     volumes:
@@ -35,19 +35,68 @@ services:
       - rag-net
 
   vllm:
-    build:
-      context: ../llm_pipeline
-      dockerfile: Dockerfile
+    image: vllm/vllm-openai:latest
+    command:
+      - --model
+      - ${VLLM_MODEL_NAME-mistralai/Mistral-7B-Instruct-v0.3}
+      - --max-model-len
+      - ${VLLM_MAX_MODEL_LEN-4096}
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION-0.9}
+      - --served-model-name
+      - ${VLLM_SERVED_MODEL_NAME:-mistral}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
     ports:
       - "8000:8000"
     environment:
-      VLLM_MODEL_NAME: mistralai/Mistral-7B-Instruct-v0.3
+      HF_TOKEN: ${HF_TOKEN-}
+      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN-}
+      VLLM_DOWNLOAD_DIR: /models
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               capabilities: [gpu]
+    volumes:
+      - mistral_models:/models
+    networks:
+      - rag-net
+    depends_on:
+      - qdrant
+
+  vllm-small:
+    image: vllm/vllm-openai:latest
+    command:
+      - --model
+      - ${VLLM_SMALL_MODEL_NAME-microsoft/Phi-3-mini-4k-instruct}
+      - --max-model-len
+      - ${VLLM_SMALL_MAX_MODEL_LEN-4096}
+      - --gpu-memory-utilization
+      - ${VLLM_SMALL_GPU_MEMORY_UTILIZATION-0.7}
+      - --served-model-name
+      - ${VLLM_SMALL_SERVED_MODEL_NAME:-phi3-mini}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8002"
+    ports:
+      - "8002:8002"
+    environment:
+      HF_TOKEN: ${HF_TOKEN-}
+      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN-}
+      VLLM_DOWNLOAD_DIR: /models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+    volumes:
+      - small_models:/models
     networks:
       - rag-net
     depends_on:
@@ -69,24 +118,40 @@ services:
 
   indexation:
     build:
-      context: ../indexation
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: indexation/Dockerfile
     environment:
       QDRANT_URL: http://qdrant:6333
+      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+    volumes:
+      - ../data/examples:/data:ro
     networks:
       - rag-net
     depends_on:
-      - ingestion
       - qdrant
 
   gateway:
     build:
       context: ../llm_pipeline
       dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
     environment:
-      VLLM_ENDPOINT: http://vllm:8000/v1
+      VLLM_ENDPOINT: ${VLLM_ENDPOINT:-http://vllm:8000/v1}
+      RAG_MODEL_ID: ${RAG_MODEL_ID:-mistral}
+      ENABLE_SMALL_MODEL: ${ENABLE_SMALL_MODEL:-true}
+      SMALL_MODEL_ID: ${SMALL_MODEL_ID:-phi3-mini}
+      SMALL_LLM_ENDPOINT: ${SMALL_LLM_ENDPOINT:-http://vllm-small:8002/v1}
+      RAG_TOP_K: ${RAG_TOP_K:-6}
+      SMALL_MODEL_TOP_K: ${SMALL_MODEL_TOP_K:-3}
+      RAG_MAX_CHUNK_CHARS: ${RAG_MAX_CHUNK_CHARS:-800}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.0}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-150}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
       QDRANT_URL: http://qdrant:6333
       KEYCLOAK_URL: http://keycloak:8080/
+      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+      BYPASS_AUTH: ${BYPASS_AUTH-true}
     networks:
       - rag-net
     depends_on:
@@ -114,6 +179,8 @@ services:
 volumes:
   mariadb_data:
   qdrant_data:
+  mistral_models:
+  small_models:
 
 networks:
   rag-net:

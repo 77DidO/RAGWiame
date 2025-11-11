@@ -16,12 +16,19 @@ class SourceCredentials:
     extra: Dict[str, str] = field(default_factory=dict)
 
 
+DEFAULT_DATA_ROOT = Path("/data")
+
+
+def _default_paths() -> List[Path]:
+    return [DEFAULT_DATA_ROOT]
+
+
 @dataclass(slots=True)
 class ConnectorConfig:
     """Configuration générique d'un connecteur d'ingestion."""
 
     enabled: bool
-    paths: List[Path] = field(default_factory=list)
+    paths: List[Path] = field(default_factory=_default_paths)
     include_metadata: bool = True
     recursive: bool = True
     credentials: SourceCredentials = field(default_factory=SourceCredentials)
