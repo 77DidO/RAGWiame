@@ -16,9 +16,9 @@ Formats pris en charge : TXT, PDF, DOCX, PPTX, XLSX (via LlamaIndex) et tables M
 
 ### Découpage et nettoyage automatiques
 
-- Les PDF/DOCX sont d'abord extraits page par page, puis re-segmentés en morceaux d'environ `chunk_size` caractères (1024 par défaut) avec un chevauchement `chunk_overlap` de 80 caractères.
-- Les étiquettes internes du type `Question : ...` / `Réponse : ...` sont supprimées pendant le nettoyage, ce qui évite que le modèle confonde la FAQ interne avec la question de l'utilisateur.
-- Chaque segment hérite du `source` original et d'un identifiant `chunk_index`.
+- Les PDF/DOCX sont extraits page par page puis re-segmentés par **paragraphes** : chaque paragraphe est nettoyé, les titres en majuscules deviennent des `section_title`, et les blocs du type `Question : ... / Réponse : ...` sont stockés individuellement avec les métadonnées `faq_question` / `faq_answer`.
+- Pour les PDF, l'extraction passe par **pdfplumber** (licence MIT), ce qui évite les artefacts produits auparavant par `pypdf`.
+- Les paragraphes sont regroupés jusqu'à atteindre `chunk_size` caractères (1024 par défaut) avec un chevauchement `chunk_overlap` de 80 caractères. Chaque chunk hérite du `source`, du `page`, d'un `chunk_index` et éventuellement de la `section_title`.
 
 Vous pouvez ajuster ces valeurs dans `ingestion/config.py` ou dans un fichier JSON personnalisé (champ `chunk_size` / `chunk_overlap`).
 

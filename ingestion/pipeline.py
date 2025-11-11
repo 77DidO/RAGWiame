@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from typing import List
+from typing import Iterable, List, Optional
 
-from ingestion.config import IngestionConfig, DEFAULT_CONFIG
+from ingestion.config import DEFAULT_CONFIG, IngestionConfig
 from ingestion.connectors.base import BaseConnector, DocumentChunk
 from ingestion.connectors.docx import DocxConnector
 from ingestion.connectors.excel import ExcelConnector
@@ -18,6 +18,23 @@ class IngestionPipeline:
     """Pipeline orchestrant la découverte, le chunking et l'envoi vers LlamaIndex."""
 
     _QUESTION_LABEL = re.compile(r"(?im)^\s*(question|réponse)\s*:\s*", re.UNICODE)
+    _FAQ_START = re.compile(r"(?is)^\s*question\s*:\s*(.+)$")
+    _FAQ_ANSWER = re.compile(r"(?is)^\s*réponse\s*:\s*(.+)$")
+    _SECTION_KEYWORDS = [
+        "VENDEUR",
+        "ACQUEREUR",
+        "ACQUÉREUR",
+        "ACHETEUR",
+        "PROPRIETAIRE",
+        "PROPRIÉTAIRE",
+        "NOTAIRE",
+        "MANDATAIRE",
+        "DIAGNOSTIC",
+        "DESIGNATION",
+        "CONDITIONS",
+        "GARANTIES",
+        "PAIEMENT",
+    ]
 
     def __init__(self, config: IngestionConfig = DEFAULT_CONFIG) -> None:
         self.config = config
@@ -39,9 +56,7 @@ class IngestionPipeline:
 
     def _clean_text(self, text: str) -> str:
         cleaned = text.replace("\u00a0", " ")
-        cleaned = cleaned.replace("\n", " ")
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-        cleaned = self._QUESTION_LABEL.sub("", cleaned)
+        cleaned = cleaned.replace("\r", "\n")
         return cleaned
 
     def _split_text(self, text: str) -> List[str]:
@@ -67,21 +82,129 @@ class IngestionPipeline:
                 break
         return chunks
 
+    def _paragraphs(self, text: str) -> List[str]:
+        cleaned = self._QUESTION_LABEL.sub("", text)
+        parts = [p.strip() for p in cleaned.split("\n") if p.strip()]
+        return parts
+
+    def _detect_section_label(self, paragraph: str) -> Optional[str]:
+        normalized = re.sub(r"\s+", " ", paragraph.strip())
+        if not normalized:
+            return None
+        upper = normalized.upper()
+        for keyword in self._SECTION_KEYWORDS:
+            if keyword in upper:
+                return keyword.title()
+        if upper.endswith(":"):
+            core = upper.rstrip(": ").title()
+            if any(ch.isalpha() for ch in core):
+                return core
+        return None
+
     def _chunk_document(self, chunk: DocumentChunk) -> Iterable[DocumentChunk]:
-        cleaned = self._clean_text(chunk.text)
-        if not cleaned:
+        raw_text = self._clean_text(chunk.text)
+        if not raw_text:
             return []
-        pieces = self._split_text(cleaned)
+        paragraphs = self._paragraphs(raw_text)
+        if not paragraphs:
+            return []
+
         chunk_metadata = dict(chunk.metadata)
         chunk_metadata.setdefault("parent_id", chunk.id)
-        for idx, piece in enumerate(pieces):
-            metadata = dict(chunk_metadata)
-            metadata["chunk_index"] = idx
-            yield DocumentChunk(
-                id=f"{chunk.id}-chunk-{idx}",
-                text=piece,
-                metadata=metadata,
-            )
+
+        current_section: Optional[str] = None
+        section_buffer: List[str] = []
+        faq_question: Optional[str] = None
+
+        general_buffer: List[str] = []
+        general_len = 0
+        size = self.config.chunk_size
+        overlap = self.config.chunk_overlap
+        idx = 0
+
+        def flush_general():
+            nonlocal general_buffer, general_len, idx
+            if not general_buffer:
+                return []
+            text_block = " ".join(general_buffer).strip()
+            chunks = []
+            start = 0
+            while start < len(text_block):
+                end = min(len(text_block), start + size)
+                snippet = text_block[start:end].strip()
+                if snippet:
+                    metadata = dict(chunk_metadata)
+                    metadata["chunk_index"] = idx
+                    chunk_id = f"{chunk.id}-chunk-{idx}"
+                    idx += 1
+                    chunks.append(DocumentChunk(id=chunk_id, text=snippet, metadata=metadata))
+                if end == len(text_block):
+                    break
+                start = max(0, end - overlap)
+            general_buffer = []
+            general_len = 0
+            return chunks
+
+        def flush_section():
+            nonlocal section_buffer, current_section, idx
+            chunks = []
+            if current_section and section_buffer:
+                text_block = " ".join(section_buffer).strip()
+                if text_block:
+                    metadata = dict(chunk_metadata)
+                    metadata["chunk_index"] = idx
+                    metadata["section_label"] = current_section
+                    chunk_id = f"{chunk.id}-section-{idx}"
+                    idx += 1
+                    chunks.append(DocumentChunk(id=chunk_id, text=text_block, metadata=metadata))
+            section_buffer = []
+            current_section = None
+            return chunks
+
+        for paragraph in paragraphs:
+            faq_match = self._FAQ_START.match(paragraph)
+            if faq_match:
+                faq_question = faq_match.group(1).strip()
+                continue
+            if faq_question:
+                faq_answer_match = self._FAQ_ANSWER.match(paragraph)
+                if faq_answer_match:
+                    answer = faq_answer_match.group(1).strip()
+                    metadata = dict(chunk_metadata)
+                    metadata["chunk_index"] = idx
+                    metadata["faq_question"] = faq_question
+                    chunk_id = f"{chunk.id}-faq-{idx}"
+                    idx += 1
+                    yield DocumentChunk(
+                        id=chunk_id,
+                        text=f"Question: {faq_question}\nRéponse: {answer}",
+                        metadata=metadata,
+                    )
+                    faq_question = None
+                    continue
+
+            label = self._detect_section_label(paragraph)
+            if label:
+                for chunk_obj in flush_section():
+                    yield chunk_obj
+                current_section = label
+                continue
+
+            if current_section:
+                section_buffer.append(paragraph)
+                continue
+
+            paragraph_len = len(paragraph)
+            if general_len + paragraph_len > size and general_buffer:
+                for chunk_obj in flush_general():
+                    yield chunk_obj
+            general_buffer.append(paragraph)
+            general_len += paragraph_len
+
+        for chunk_obj in flush_section():
+            yield chunk_obj
+        for chunk_obj in flush_general():
+            yield chunk_obj
 
     def run(self) -> Iterable[DocumentChunk]:
         for connector in self.connectors:

@@ -29,9 +29,14 @@ Cette page détaille les variables d’environnement et paramètres importants. 
 | `SMALL_MODEL_TOP_K` | Nombre de chunks pour le modèle léger (Phi‑3, etc.) | 3 |
 | `RAG_MAX_CHUNK_CHARS` | Tronque chaque chunk à N caractères après normalisation (espace unique) | 800 |
 
-### Reranker
+### Reranker hybride (SBERT + BM25)
 
-La Gateway récupère `top_k * 3` chunks puis applique un reranker SBERT (multilingue) pour ne conserver que les `top_k` meilleurs. Cela limite les réponses hors-sujet lorsque plusieurs documents parlent de thèmes différents. Ajustez `RAG_TOP_K` ou `SMALL_MODEL_TOP_K` pour contrôler la profondeur de recherche.
+1. La Gateway récupère `top_k * 3` chunks densément via LlamaIndex.
+2. Un reranker SBERT multilingue garde les `top_k` meilleurs.
+3. Un reranker **BM25** (librairie `rank-bm25`) re-scorise ces chunks en fonction des mots présents dans la question pour éviter les réponses hors-sujet (ex. sections FAQ).
+4. Seules les phrases contenant les mots-clés de la question sont conservées avant l'appel au LLM, ce qui limite les répétitions inutiles.
+
+Ajustez `RAG_TOP_K` / `SMALL_MODEL_TOP_K` pour contrôler la profondeur avant reranking.
 
 ## Options LLM / Génération
 

@@ -9,7 +9,8 @@ from llama_index.core import QueryBundle, VectorStoreIndex
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.vector_stores.types import MetadataFilters
 from llama_index.llms.openai_like import OpenAILike
-from llama_index.postprocessor.sbert_rerank import SentenceTransformerRerank
+from llama_index.core.postprocessor.sbert_rerank import SentenceTransformerRerank
+from rank_bm25 import BM25Okapi
 
 
 @dataclass(slots=True)
@@ -65,29 +66,72 @@ class RagPipeline:
         )
         self.qa_prompt = PromptTemplate(self.qa_template)
 
-    def _format_context(self, nodes: List) -> str:
+    def _select_relevant_text(self, text: str, keywords: List[str]) -> str:
+        text = re.sub(r"\s+", " ", text).strip()
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        if keywords:
+            matches = [
+                sentence
+                for sentence in sentences
+                if any(keyword in sentence.lower() for keyword in keywords)
+            ]
+        else:
+            matches = []
+        snippet = " ".join(matches) if matches else text
+        if len(snippet) > self.max_chunk_chars:
+            snippet = snippet[: self.max_chunk_chars].rstrip() + "…"
+        return snippet
+
+    def _format_context(self, nodes: List, question: str) -> str:
+        keywords = [kw for kw in self._tokenize(question) if len(kw) > 2]
         chunks: List[str] = []
         for idx, node in enumerate(nodes, start=1):
             metadata = node.metadata or {}
             source = metadata.get("source", "inconnu")
             page = metadata.get("page")
+            section = metadata.get("section_title") or metadata.get("faq_question")
             header = f"[{idx}] Source: {source}"
             if page is not None:
                 header += f" | Page: {page}"
-            text = ""
-            if hasattr(node, "node") and node.node is not None:
-                text = node.node.get_content().strip()
-            elif hasattr(node, "text"):
-                text = str(node.text).strip()
+            if section:
+                header += f" | Section: {section}"
+            text = self._extract_node_text(node)
             if not text:
                 continue
-            text = re.sub(r"\s+", " ", text)
-            if len(text) > self.max_chunk_chars:
-                text = text[: self.max_chunk_chars].rstrip() + "…"
-            chunks.append(f"{header}\n{text}")
+            snippet = self._select_relevant_text(text, keywords)
+            chunks.append(f"{header}\n{snippet}")
         if not chunks:
             return "Aucun extrait pertinent."
         return "\n\n".join(chunks[: self.top_k])
+
+    def _tokenize(self, text: str) -> List[str]:
+        return re.findall(r"[a-z0-9]+", text.lower())
+
+    def _extract_node_text(self, node) -> str:
+        if hasattr(node, "node") and node.node is not None:
+            return node.node.get_content().strip()
+        return getattr(node, "text", "").strip()
+
+    def _bm25_rerank(self, nodes: List, question: str) -> List:
+        if not nodes:
+            return nodes
+        corpus = []
+        contents = []
+        for node in nodes:
+            text = self._extract_node_text(node)
+            contents.append(text)
+            corpus.append(self._tokenize(text))
+        if not any(corpus):
+            return nodes
+        bm25 = BM25Okapi(corpus)
+        scores = bm25.get_scores(self._tokenize(question))
+        ranked = sorted(
+            zip(scores, nodes, contents),
+            key=lambda item: item[0],
+            reverse=True,
+        )
+        ranked_nodes = [node for _, node, _ in ranked]
+        return ranked_nodes[: self.top_k]
 
     def query(self, question: str, filters: MetadataFilters | None = None) -> RagQueryResult:
         retriever = self.index.as_retriever(similarity_top_k=self.initial_top_k, filters=filters)
@@ -95,7 +139,8 @@ class RagPipeline:
         nodes = retriever.retrieve(query_bundle)
         if nodes and self.reranker is not None:
             nodes = self.reranker.postprocess_nodes(nodes, query_bundle=query_bundle)
-        context_text = self._format_context(nodes)
+        nodes = self._bm25_rerank(nodes, question)
+        context_text = self._format_context(nodes, question)
         response = self.llm.predict(
             self.qa_prompt,
             context=context_text,

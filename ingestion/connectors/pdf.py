@@ -1,4 +1,4 @@
-"""Connecteur PDF basé sur pypdf."""
+"""Connecteur PDF basé sur pdfplumber (licence MIT)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,26 +22,27 @@ class PDFConnector(BaseConnector):
 
     def load(self, path: Path) -> Iterable[DocumentChunk]:
         try:
-            from pypdf import PdfReader
-        except ImportError as exc:  # pragma: no cover - dépendance optionnelle
-            raise ImportError("pypdf doit être installé pour utiliser le connecteur PDF") from exc
+            import pdfplumber
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("pdfplumber doit être installé pour utiliser le connecteur PDF") from exc
 
-        reader = PdfReader(str(path))
-        for index, page in enumerate(reader.pages):
-            text = page.extract_text() or ""
-            metadata = self._build_metadata(path, index, reader)
-            yield DocumentChunk(id=f"{path.stem}-page-{index}", text=text, metadata=metadata)
+        with pdfplumber.open(str(path)) as pdf:
+            doc_metadata = pdf.metadata or {}
+            for index, page in enumerate(pdf.pages):
+                text = page.extract_text() or ""
+                metadata = self._build_metadata(path, index, doc_metadata)
+                yield DocumentChunk(id=f"{path.stem}-page-{index}", text=text, metadata=metadata)
 
-    def _build_metadata(self, path: Path, index: int, reader: "PdfReader") -> dict:
-        info = reader.metadata or {}
+    def _build_metadata(self, path: Path, index: int, info: dict) -> dict:
         metadata: dict = {
             "source": str(path),
             "page": index,
             "document_type": self.document_type,
         }
-        for key in ("/Author", "/Creator", "/Producer", "/CreationDate"):
-            if key in info:
-                metadata[key.strip("/").lower()] = info[key]
+        for key in ("Author", "Creator", "Producer", "CreationDate", "Title"):
+            value = info.get(key) or info.get(f"/{key}")
+            if value:
+                metadata[key.lower()] = value
         return metadata
 
 
