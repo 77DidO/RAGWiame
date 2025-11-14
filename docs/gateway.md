@@ -15,10 +15,13 @@ Cette page détaille les variables d’environnement et paramètres importants. 
 | `RAG_MODEL_ID` | Nom du modèle « principal » que les clients doivent utiliser (`mistral`, `rag-default`, etc.) | `mistral` |
 | `VLLM_ENDPOINT` | URL OpenAI-like exposée par vLLM pour ce modèle | `http://vllm:8000/v1` |
 | `VLLM_API_KEY` | Jeton transmis à vLLM (placeholder pour compatibilité) | `changeme` |
-| `HF_EMBEDDING_MODEL` | Modèle Hugging Face utilisé pour l’index LlamaIndex | `sentence-transformers/distiluse-base-multilingual-cased-v2` |
+| `HF_EMBEDDING_MODEL` | Modèle Hugging Face utilisé pour l'index LlamaIndex | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` |
 | `QDRANT_URL` | Endpoint HTTP de Qdrant | `http://qdrant:6333` |
 | `KEYCLOAK_URL` | Base URL de Keycloak (utilisée par l’OAuth2) | `http://keycloak:8080/` |
 | `BYPASS_AUTH` | `true` pour ignorer l’OAuth dans les environnements de dev | `true` (dans `docker-compose`) |
+| `MARIADB_HOST/PORT/DB/USER/PASSWORD` | Accès aux tables `document_insights` et `document_inventory` (montants + inventaire). | `mariadb` / `3306` / `rag` / `rag_user` / `changeme` |
+| `DATA_ROOT` | Chemin monté dans le conteneur pour servir les fichiers en lecture (`/files/view`). | `/data` |
+| `PUBLIC_GATEWAY_URL` | URL publique à utiliser pour générer les liens de téléchargement (ex. `http://localhost:8081`). | `http://localhost:8081` |
 
 ## Options Retrieval / RAG
 
@@ -28,6 +31,8 @@ Cette page détaille les variables d’environnement et paramètres importants. 
 | `RAG_TOP_K` | Nombre de chunks remontés pour le modèle principal | 6 |
 | `SMALL_MODEL_TOP_K` | Nombre de chunks pour le modèle léger (Phi‑3, etc.) | 3 |
 | `RAG_MAX_CHUNK_CHARS` | Tronque chaque chunk à N caractères après normalisation (espace unique) | 800 |
+| `ENABLE_INSIGHTS` | Active l’utilisation des montants extraits (table `document_insights`). | `true` |
+| `ENABLE_INVENTORY` | Active l’inventaire des documents (table `document_inventory`). | `true` |
 
 ### Reranker hybride (SBERT + BM25)
 
@@ -47,9 +52,10 @@ Ajustez `RAG_TOP_K` / `SMALL_MODEL_TOP_K` pour contrôler la profondeur avant re
 | `LLM_MAX_RETRIES` | Nombre de tentatives côté client OpenAI-like ; mettez `1` pour échouer rapidement si vLLM ne répond pas. |
 | `ENABLE_SMALL_MODEL` | `true` ⇒ la Gateway expose un deuxième modèle accessible via `SMALL_MODEL_ID`. |
 | `SMALL_MODEL_ID` | Nom que les clients doivent spécifier (`phi3-mini`, `llm-small`, …). |
-| `SMALL_LLM_ENDPOINT` | URL OpenAI-like pointant vers `vllm-small`. |
+| `SMALL_LLM_ENDPOINT` | URL OpenAI-like pointant vers `vllm-light` (profil `light`). |
+| `MARIADB_HOST`, `MARIADB_PORT`, `MARIADB_DB`, `MARIADB_USER`, `MARIADB_PASSWORD` | Paramètres utilisés par la Gateway pour interroger la table `document_insights` (montants DQE). | `mariadb`, `3306`, `rag`, `rag_user`, `changeme` |
 
-> ⚠️ Pour que `phi3-mini` apparaisse dans `/v1/models`, il faut **à la fois** que `ENABLE_SMALL_MODEL=true` et que le service `vllm-small` soit en cours d’exécution.
+> ⚠️ Pour que `phi3-mini` apparaisse dans `/v1/models`, il faut **à la fois** que `ENABLE_SMALL_MODEL=true` et que le service optionnel `vllm-light` soit en cours d’exécution (`docker compose --profile light up -d vllm-light`).
 
 ## Exemple de bloc `gateway` (docker compose)
 
@@ -63,9 +69,9 @@ Ajustez `RAG_TOP_K` / `SMALL_MODEL_TOP_K` pour contrôler la profondeur avant re
     environment:
       RAG_MODEL_ID: mistral
       VLLM_ENDPOINT: http://vllm:8000/v1
-      ENABLE_SMALL_MODEL: "true"
+      ENABLE_SMALL_MODEL: "false"
       SMALL_MODEL_ID: phi3-mini
-      SMALL_LLM_ENDPOINT: http://vllm-small:8002/v1
+      SMALL_LLM_ENDPOINT: http://vllm-light:8002/v1
       RAG_TOP_K: "6"
       SMALL_MODEL_TOP_K: "2"
       RAG_MAX_CHUNK_CHARS: "600"
@@ -88,7 +94,7 @@ docker compose -f infra/docker-compose.yml up -d gateway
 
 ## Modèles multiples (Mistral + Phi‑3 mini)
 
-1. Lancez les services requis : `docker compose -f infra/docker-compose.yml up -d vllm vllm-small gateway`.
+1. Lancez les services requis : `docker compose -f infra/docker-compose.yml up -d vllm gateway`. Quand vous souhaitez tester Phi-3 mini, activez le profil dédié : `docker compose --profile light up -d vllm-light`.
 2. Ajoutez dans Open WebUI deux presets pointant vers `http://gateway:8081/v1` mais avec `model` = `mistral` ou `phi3-mini`.
 3. Ajustez `SMALL_MODEL_TOP_K` et `RAG_MAX_CHUNK_CHARS` si le modèle léger hallucine ou sature.
 
@@ -100,7 +106,7 @@ docker compose -f infra/docker-compose.yml up -d gateway
 ## Surveillance & logs
 
 - `docker compose -f infra/docker-compose.yml logs -f gateway` : pipeline, warnings Qdrant, erreurs LLM.  
-- `docker compose -f infra/docker-compose.yml logs -f vllm-small` : surveillez les “Avg generation throughput” pour détecter les temps de réponse trop longs.  
+- `docker compose -f infra/docker-compose.yml logs -f vllm-light` (profil `light`) : surveillez les “Avg generation throughput” pour détecter les temps de réponse trop longs.  
 - Ajustez `LLM_TIMEOUT` ou `RAG_TOP_K` si vous voyez des `openai.APITimeoutError` dans la Gateway.
 
 ## Résumé rapide des réglages critiques
@@ -110,7 +116,7 @@ docker compose -f infra/docker-compose.yml up -d gateway
 | Limiter la taille du contexte | `RAG_TOP_K`, `SMALL_MODEL_TOP_K`, `RAG_MAX_CHUNK_CHARS` |
 | Durcir les réponses (pas d’hallucinations) | `LLM_TEMPERATURE=0`, prompt fourni dans `pipeline.py` |
 | Réduire le temps de réponse | Diminuer `top_k`, augmenter `LLM_TIMEOUT`, arrêter les modèles inutiles |
-| Cacher Phi‑3 mini côté clients | `ENABLE_SMALL_MODEL=false` **et** arrêter `vllm-small` |
+| Cacher Phi‑3 mini côté clients | `ENABLE_SMALL_MODEL=false` **et** ne pas lancer le profil `light` (`vllm-light`) |
 | Basculer sur un autre modèle Hugging Face | mettre à jour `VLLM_MODEL_NAME` / `VLLM_SERVED_MODEL_NAME` (service `vllm`) et `RAG_MODEL_ID` |
 
 Gardez cette page sous la main lorsque vous adaptez la plateforme à un nouvel environnement ou à un client spécifique. Elle regroupe les leviers principaux qui influent sur la qualité des réponses et la stabilité du pipeline RAG.

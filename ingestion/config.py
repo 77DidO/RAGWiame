@@ -67,7 +67,7 @@ class IngestionConfig:
     excel_options: ExcelConnectorOptions = field(default_factory=ExcelConnectorOptions)
     mariadb: MariaDBConfig = field(default_factory=MariaDBConfig)
     mariadb_source: ConnectorConfig = field(default_factory=lambda: ConnectorConfig(enabled=False))
-    chunk_size: int = 1024
+    chunk_size: int = 600
     chunk_overlap: int = 80
     language: str = "fr"
 

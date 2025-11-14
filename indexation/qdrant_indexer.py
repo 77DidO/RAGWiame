@@ -25,7 +25,7 @@ class QdrantIndexer:
         embedding_model: Optional[str] = None,
     ) -> None:
         model_name = embedding_model or os.getenv(
-            "HF_EMBEDDING_MODEL", "sentence-transformers/distiluse-base-multilingual-cased-v2"
+            "HF_EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
         )
         self.client = QdrantClient(url=qdrant_url)
         self.vector_store = QdrantVectorStore(client=self.client, collection_name=collection_name)

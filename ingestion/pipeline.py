@@ -110,6 +110,9 @@ class IngestionPipeline:
             return []
 
         chunk_metadata = dict(chunk.metadata)
+        doc_hint = self._infer_doc_hint(chunk_metadata)
+        if doc_hint:
+            chunk_metadata["doc_hint"] = doc_hint
         chunk_metadata.setdefault("parent_id", chunk.id)
 
         current_section: Optional[str] = None
@@ -128,19 +131,12 @@ class IngestionPipeline:
                 return []
             text_block = " ".join(general_buffer).strip()
             chunks = []
-            start = 0
-            while start < len(text_block):
-                end = min(len(text_block), start + size)
-                snippet = text_block[start:end].strip()
-                if snippet:
-                    metadata = dict(chunk_metadata)
-                    metadata["chunk_index"] = idx
-                    chunk_id = f"{chunk.id}-chunk-{idx}"
-                    idx += 1
-                    chunks.append(DocumentChunk(id=chunk_id, text=snippet, metadata=metadata))
-                if end == len(text_block):
-                    break
-                start = max(0, end - overlap)
+            if text_block:
+                metadata = dict(chunk_metadata)
+                metadata["chunk_index"] = idx
+                chunk_id = f"{chunk.id}-chunk-{idx}"
+                idx += 1
+                chunks.append(DocumentChunk(id=chunk_id, text=text_block, metadata=metadata))
             general_buffer = []
             general_len = 0
             return chunks
@@ -211,6 +207,28 @@ class IngestionPipeline:
             for item in connector.discover():
                 for chunk in connector.load(item):  # type: ignore[arg-type]
                     yield from self._chunk_document(chunk)
+
+    def _infer_doc_hint(self, metadata: dict) -> Optional[str]:
+        source = str(metadata.get("source", "")).lower()
+        if not source:
+            return None
+
+        def contains(*keywords: str) -> bool:
+            return any(keyword in source for keyword in keywords)
+
+        if source.endswith(".msg") or contains("courriel", "courrier", "email", "mail"):
+            return "courriel"
+        if contains("planning", "gantt"):
+            return "planning"
+        if contains("memoire", "mémoire", "presentation", "présentation"):
+            return "memoire"
+        if contains("dqe", "bordereau", "bpu", "prix"):
+            return "dqe"
+        if source.endswith(".xlsx") or source.endswith(".xls"):
+            return "tableur"
+        if source.endswith(".pdf"):
+            return "pdf"
+        return None
 
 
 __all__ = ["IngestionPipeline"]

@@ -5,7 +5,7 @@ Plateforme RAG open source orientée francophonie. Ce dépôt fournit un kit com
 ## Panorama des services
 
 - **vLLM (Mistral)** : sert le modèle `mistralai/Mistral-7B-Instruct-v0.3` via une API compatible OpenAI pour le mode RAG.
-- **vLLM (Phi-3 mini)** : second service optionnel pour tester le RAG avec un modèle plus compact (`microsoft/Phi-3-mini-4k-instruct`, servi sous l’alias `phi3-mini`).
+- **vLLM (Phi-3 mini)** : service optionnel à lancer uniquement lorsque la VRAM le permet (`microsoft/Phi-3-mini-4k-instruct`, servi sous l’alias `phi3-mini`).
 - **Gateway FastAPI** : applique la logique RAG (retrieval + génération) et expose `/rag/query` ainsi que `/v1/chat/completions`.
 - **Qdrant** : stockage vectoriel (collection `rag_documents`) et API HTTP pour maintenance.
 - **MariaDB** : source optionnelle pour l’ingestion relationnelle.
@@ -36,7 +36,8 @@ Le script vérifie que Docker Desktop tourne, installe les dépendances Python p
 ## Vérifier l’infrastructure
 
 ```powershell
-docker compose -f infra/docker-compose.yml ps
+docker compose -f infra/docker-compose.yml up -d      # démarre tous les services
+docker compose -f infra/docker-compose.yml ps         # vérifie leur état
 docker compose -f infra/docker-compose.yml logs gateway
 ```
 
@@ -44,7 +45,7 @@ Ports exposés :
 
 - Gateway RAG : `http://localhost:8081`
 - vLLM Mistral : `http://localhost:8000/v1`
-- vLLM léger : `http://localhost:8002/v1`
+- vLLM léger (optionnel) : `http://localhost:8002/v1`
 - Qdrant : `http://localhost:6333`
 - Open WebUI : `http://localhost:8080` (auth Keycloak)
 
@@ -86,7 +87,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 
 ### Modèle léger pour tester le RAG
 
-Une instance vLLM supplémentaire expose un modèle plus petit (`phi3-mini` par défaut) sur `http://localhost:8002/v1`. La Gateway applique toujours le pipeline RAG (retrieval + réponse), mais utilise ce modèle à la place de Mistral :
+Une instance vLLM supplémentaire **optionnelle** peut exposer un modèle plus petit (`phi3-mini` par défaut) sur `http://localhost:8002/v1`. La Gateway applique toujours le pipeline RAG (retrieval + réponse), mais utilise ce modèle à la place de Mistral :
 
 ```bash
 curl -X POST http://localhost:8081/v1/chat/completions \
@@ -94,7 +95,7 @@ curl -X POST http://localhost:8081/v1/chat/completions \
   -d '{"model":"phi3-mini","messages":[{"role":"user","content":"Réponds-moi brièvement"}]}'
 ```
 
-Dans Open WebUI, créez un preset `phi3-mini` (URL identique à `mistral`) : seul le champ `Model` change. Selon la VRAM disponible, vous pouvez démarrer/arrêter `vllm-small` indépendamment (`docker compose up -d vllm-small`, `docker compose stop vllm-small`).
+Dans Open WebUI, créez un preset `phi3-mini` (URL identique à `mistral`) : seul le champ `Model` change. Selon la VRAM disponible, démarrez/arrêtez `vllm-light` indépendamment (`docker compose --profile light up -d vllm-light`, `docker compose --profile light stop vllm-light`).
 
 Variables utiles (`infra/docker-compose.yml`) :
 
@@ -102,7 +103,7 @@ Variables utiles (`infra/docker-compose.yml`) :
 - `ENABLE_SMALL_MODEL` : permet de masquer l’option côté Gateway lorsqu’il n’est pas lancé.
 - `SMALL_MODEL_ID` : valeur attendue dans le champ `model` (doit correspondre à `--served-model-name`).
 
-> ⚠️ Attention : lancer simultanément Mistral 7B et Phi-3 mini consomme la somme de leurs VRAM. Si votre carte ne le permet pas, désactivez `vllm-small` (profils Docker ou `ENABLE_SMALL_MODEL=false`) et ne relancez que lorsque vous souhaitez tester le modèle léger.
+> ⚠️ Attention : lancer simultanément Mistral 7B et Phi-3 mini consomme la somme de leurs VRAM. Si votre carte ne le permet pas, laissez `ENABLE_SMALL_MODEL=false` et n’activez le profil `light` (`vllm-light`) que ponctuellement.
 
 ## Ingestion et indexation
 
@@ -111,14 +112,44 @@ Deux approches complémentaires sont détaillées dans [docs/ingestion.md](docs/
 1. **Scripts CLI**
    ```powershell
    # Copier les fichiers dans data/examples/ avant de lancer les jobs
-   docker compose -f infra/docker-compose.yml run --rm ingestion
-   docker compose -f infra/docker-compose.yml run --rm indexation
-   ```
+docker compose -f infra/docker-compose.yml run --rm ingestion
+docker compose -f infra/docker-compose.yml run --rm indexation
+docker compose -f infra/docker-compose.yml run --rm insights   # extraction des totaux DQE
+docker compose -f infra/docker-compose.yml run --rm inventory  # inventaire des documents par projet
+```
 2. **Mini UI FastAPI**
    ```bash
    pip install -r upload_ui/requirements.txt
    uvicorn upload_ui.main:app --port 8001 --reload
    ```
+
+### Classification LLM (document → type)
+
+Après ingestion/indexation, lancez la classification pour typer chaque fichier (résultat stocké dans MariaDB, table `document_classification`) :
+
+```powershell
+docker compose -f infra/docker-compose.yml run --rm classification
+```
+
+Variables utiles :
+
+- `CLASSIFIER_MODEL_ID` : modèle interrogé (`mistral` par défaut, mettez `phi3-mini` si vous activez le profil light).
+- `CLASSIFIER_API_BASE` / `CLASSIFIER_API_KEY` : endpoint OpenAI-like à utiliser (par défaut `http://vllm:8000/v1`).
+- `CLASSIFIER_MAX_DOC_CHARS` : nombre de caractères analysés par document (tronqués automatiquement).
+- `CLASSIFIER_ALLOW_FREE_LABELS=true` : autorise le LLM à inventer un label libre (`raw_label`). Le champ `document_label`
+  est prévu pour une normalisation manuelle dans votre UI (initialement identique au label brut).
+- Le pipeline infère automatiquement un `doc_hint` (dqe, courriel, planning, mémoire…) à partir du nom/chemin du fichier
+  et l'injecte dans le prompt afin d'améliorer la classification. Résultat : `raw_label` conserve la suggestion brute,
+  `document_label` contient la version normalisée (mapped via le `doc_hint`).
+
+⚠️ Par défaut, le classifieur doit choisir son label parmi la liste embarquée (`document_marche`, `dqe_bordereau`,
+`memoire_technique`, `courriel_consultation`, `etude_plan`). Fournissez un fichier JSON personnalisé via `--labels-path`
+si besoin. En mode libre (`CLASSIFIER_ALLOW_FREE_LABELS=true`), il peut suggérer un label inédit (stocké dans `raw_label`)
+que vous pourrez normaliser plus tard dans votre UI (`document_label`). Les jobs `insights` et `inventory` enrichissent
+MariaDB avec les montants issus des DQE (lignes `TOTAL`) et l'inventaire complet des documents par projet : la Gateway
+peut ainsi répondre directement aux questions « Quel est le montant total ? » et « Quels documents as-tu pour ce projet ? ».
+Les références sont renvoyées sous la forme de liens cliquables (`http://localhost:8081/files/view?...`) permettant
+d’ouvrir le document à partir de l’UI.
    Rendez-vous sur http://localhost:8001 pour déposer vos documents. Une case à cocher permet de déclencher automatiquement ingestion + indexation.
 
 Le guide [docs/ingestion.md](docs/ingestion.md) explique aussi comment relancer une indexation complète, supprimer certains documents dans Qdrant, ou diagnostiquer via l’API (`/collections`, `points/delete`, etc.).

@@ -1,14 +1,18 @@
 """API FastAPI orchestrant le pipeline RAG et la sélection dynamique des modèles."""
 from __future__ import annotations
 
+import mimetypes
 import os
 import time
 import uuid
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2AuthorizationCodeBearer
+from fastapi.responses import FileResponse
 from llama_index.core import VectorStoreIndex
 from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -17,6 +21,8 @@ from pydantic import BaseModel
 from qdrant_client import QdrantClient
 
 from llm_pipeline.pipeline import RagPipeline
+from llm_pipeline.insights import DocumentInsightService
+from llm_pipeline.inventory import DocumentInventoryService
 
 RAG_MODEL_ID = os.getenv("RAG_MODEL_ID", "mistral")
 RAG_ENDPOINT = os.getenv("VLLM_ENDPOINT", "http://vllm:8000/v1")
@@ -24,13 +30,19 @@ BYPASS_AUTH = os.getenv("BYPASS_AUTH", "false").lower() in {"1", "true", "yes"}
 
 SMALL_MODEL_ENABLED = os.getenv("ENABLE_SMALL_MODEL", "false").lower() in {"1", "true", "yes"}
 SMALL_MODEL_ID = os.getenv("SMALL_MODEL_ID", "phi3-mini")
-SMALL_LLM_ENDPOINT = os.getenv("SMALL_LLM_ENDPOINT", "http://vllm-small:8002/v1")
+SMALL_LLM_ENDPOINT = os.getenv("SMALL_LLM_ENDPOINT", "http://vllm-light:8002/v1")
 
 MODEL_ENDPOINTS: Dict[str, str] = {RAG_MODEL_ID: RAG_ENDPOINT}
 if SMALL_MODEL_ENABLED:
     MODEL_ENDPOINTS[SMALL_MODEL_ID] = SMALL_LLM_ENDPOINT
 
+ENABLE_RERANKER = os.getenv("ENABLE_RERANKER", "true").lower() in {"1", "true", "yes"}
+DATA_ROOT = Path(os.getenv("DATA_ROOT", "/data")).resolve()
+PUBLIC_GATEWAY_URL = os.getenv("PUBLIC_GATEWAY_URL", "http://localhost:8081").rstrip("/")
+
 app = FastAPI(title="RAGWiame Gateway", version="0.1.0")
+insight_service = DocumentInsightService()
+inventory_service = DocumentInventoryService()
 
 oauth2_scheme = OAuth2AuthorizationCodeBearer(
     authorizationUrl=os.getenv("KEYCLOAK_URL", "http://keycloak:8080/")
@@ -50,7 +62,7 @@ class QueryPayload(BaseModel):
 DEFAULT_SERVICE = os.getenv("DEFAULT_RAG_SERVICE", "").strip()
 DEFAULT_ROLE = os.getenv("DEFAULT_RAG_ROLE", "").strip()
 EMBEDDING_MODEL = os.getenv(
-    "HF_EMBEDDING_MODEL", "sentence-transformers/distiluse-base-multilingual-cased-v2"
+    "HF_EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )
 DEFAULT_TOP_K = int(os.getenv("RAG_TOP_K", "6"))
 SMALL_MODEL_TOP_K = int(os.getenv("SMALL_MODEL_TOP_K", "3"))
@@ -121,6 +133,7 @@ def get_pipeline(model_id: str) -> RagPipeline:
         temperature=LLM_TEMPERATURE,
         max_chunk_chars=MAX_CHUNK_CHARS,
         max_retries=LLM_MAX_RETRIES,
+        enable_reranker=ENABLE_RERANKER,
     )
 
 
@@ -145,9 +158,18 @@ def _build_filters(payload: QueryPayload) -> MetadataFilters:
 
 
 def _execute_query(payload: QueryPayload, model_id: str) -> QueryResponse:
+    inventory = inventory_service.try_answer(payload.question)
+    if inventory:
+        enriched_answer = _append_citations_text(inventory["answer"], inventory["citations"])
+        return QueryResponse(answer=enriched_answer, citations=inventory["citations"])
+    insight = insight_service.try_answer(payload.question)
+    if insight:
+        enriched_answer = _append_citations_text(insight["answer"], insight["citations"])
+        return QueryResponse(answer=enriched_answer, citations=insight["citations"])
     pipeline = get_pipeline(model_id)
     result = pipeline.query(payload.question, filters=_build_filters(payload))
-    return QueryResponse(answer=result.answer, citations=result.citations)
+    enriched_answer = _append_citations_text(result.answer, result.citations)
+    return QueryResponse(answer=enriched_answer, citations=result.citations)
 
 
 def _ensure_token(token: Optional[str]) -> None:
@@ -155,6 +177,78 @@ def _ensure_token(token: Optional[str]) -> None:
         return
     if not token:
         raise HTTPException(status_code=401, detail="Token invalide")
+
+
+def _append_citations_text(answer: str, citations: List[Dict[str, Any]]) -> str:
+    if not citations:
+        return answer
+    unique: List[Dict[str, Any]] = []
+    seen = set()
+    for citation in citations:
+        source = str(citation.get("source", ""))
+        chunk = str(citation.get("chunk", "") or "")
+        key = (source, chunk)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(citation)
+    if not unique:
+        return answer
+    block_lines = ["> **Références :**"]
+    for idx, citation in enumerate(unique, start=1):
+        link = _format_reference_link(citation)
+        snippet = _format_citation_snippet(citation)
+        block_lines.append(f"> {idx}. {link}")
+        if snippet:
+            block_lines.append(f">    ↳ {snippet}")
+    joined = "\n".join(block_lines)
+    return f"{answer}\n\n{joined}"
+
+
+def _format_reference_link(citation: Dict[str, Any]) -> str:
+    source = str(citation.get("source", "source inconnue"))
+    chunk = str(citation.get("chunk", "") or "").strip()
+    relative = source
+    if source.startswith("/data/"):
+        relative = source[len("/data/") :]
+    elif source.startswith(str(DATA_ROOT)):
+        relative = str(Path(source).relative_to(DATA_ROOT))
+    relative = relative.replace("\\", "/")
+    link = f"{PUBLIC_GATEWAY_URL}/files/view?path={quote(relative)}"
+    base_name = Path(relative).name or relative
+    display_path = relative
+    chunk_suffix = _format_chunk_suffix(base_name, chunk)
+    if chunk_suffix:
+        display_path = f"{relative} · {chunk_suffix}"
+    safe_label = display_path.replace("`", "'")
+    return f"[{safe_label}]({link})"
+
+
+def _format_citation_snippet(citation: Dict[str, Any]) -> str:
+    snippet = str(citation.get("snippet", "") or "").strip()
+    if not snippet:
+        return ""
+    chunk = str(citation.get("chunk", "") or "")
+    normalized_chunk = " ".join(chunk.split()).strip().strip('"').lower()
+    normalized_snippet = " ".join(snippet.split()).strip().strip('"').lower()
+    if normalized_chunk and normalized_chunk == normalized_snippet:
+        return ""
+    snippet = " ".join(snippet.split())
+    if len(snippet) > 320:
+        snippet = snippet[:320].rstrip() + "…"
+    return snippet
+
+
+def _format_chunk_suffix(base_name: str, chunk: str) -> str:
+    if not chunk:
+        return ""
+    cleaned_chunk = " ".join(chunk.split())
+    if cleaned_chunk.lower() == base_name.lower():
+        return ""
+    parts = [part.strip() for part in cleaned_chunk.split("::") if part.strip()]
+    if parts and parts[0].lower() == base_name.lower():
+        parts = parts[1:]
+    return " · ".join(parts)
 
 
 @app.post("/rag/query", response_model=QueryResponse)
@@ -180,6 +274,23 @@ async def list_models() -> Dict[str, List[ModelInfo]]:
     """Route OpenAI-compatible retournant les modèles disponibles."""
     models = [ModelInfo(id=model_id) for model_id in MODEL_ENDPOINTS.keys()]
     return {"data": models}
+
+
+INLINE_MEDIA_TYPES = {"application/pdf", "text/plain", "text/html"}
+
+
+@app.get("/files/view")
+async def view_file(path: str):
+    target = (DATA_ROOT / path).resolve()
+    if not target.is_file() or not str(target).startswith(str(DATA_ROOT)):
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    media_type, _ = mimetypes.guess_type(str(target))
+    if media_type is None:
+        media_type = "application/octet-stream"
+    disposition = "inline" if media_type in INLINE_MEDIA_TYPES else "attachment"
+    response = FileResponse(target, media_type=media_type)
+    response.headers["Content-Disposition"] = f'{disposition}; filename="{target.name}"'
+    return response
 
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)

@@ -1,0 +1,21 @@
+{
+  "txt": {
+    "enabled": true,
+    "paths": ["C:/Projets/RAGWiame/data/examples"]
+  },
+  "docx": {
+    "enabled": true,
+    "paths": ["C:/Projets/RAGWiame/data/examples"]
+  },
+  "pdf": {
+    "enabled": true,
+    "paths": ["C:/Projets/RAGWiame/data/examples"]
+  },
+  "excel": {
+    "enabled": true,
+    "paths": ["C:/Projets/RAGWiame/data/examples"]
+  },
+  "chunk_size": 600,
+  "chunk_overlap": 80,
+  "language": "fr"
+}

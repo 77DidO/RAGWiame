@@ -68,7 +68,7 @@ services:
     depends_on:
       - qdrant
 
-  vllm-small:
+  vllm-light:
     image: vllm/vllm-openai:latest
     command:
       - --model
@@ -101,6 +101,7 @@ services:
       - rag-net
     depends_on:
       - qdrant
+    profiles: ["light"]
 
   ingestion:
     build:
@@ -116,13 +117,60 @@ services:
       - mariadb
       - qdrant
 
+  insights:
+    build:
+      context: ../ingestion
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "ingestion.insights_cli"]
+    environment:
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
+    volumes:
+      - ../data/examples:/data:ro
+    networks:
+      - rag-net
+    depends_on:
+      - mariadb
+
+  inventory:
+    build:
+      context: ../ingestion
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "ingestion.inventory_cli"]
+    environment:
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
+    volumes:
+      - ../data/examples:/data:ro
+    networks:
+      - rag-net
+    depends_on:
+      - mariadb
+
+  classification:
+    build:
+      context: ../ingestion
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "ingestion.classify_cli"]
+    environment:
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
+      CLASSIFIER_API_BASE: ${CLASSIFIER_API_BASE:-http://vllm:8000/v1}
+      CLASSIFIER_API_KEY: ${CLASSIFIER_API_KEY:-changeme}
+      CLASSIFIER_MODEL_ID: ${CLASSIFIER_MODEL_ID:-mistral}
+      CLASSIFIER_MAX_DOC_CHARS: ${CLASSIFIER_MAX_DOC_CHARS:-6000}
+    volumes:
+      - ../data/examples:/data:ro
+    networks:
+      - rag-net
+    depends_on:
+      - mariadb
+      - vllm
+
   indexation:
     build:
       context: ..
       dockerfile: indexation/Dockerfile
     environment:
       QDRANT_URL: http://qdrant:6333
-      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
     volumes:
       - ../data/examples:/data:ro
     networks:
@@ -136,12 +184,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8081:8081"
+    volumes:
+      - ../data/examples:/data:ro
     environment:
       VLLM_ENDPOINT: ${VLLM_ENDPOINT:-http://vllm:8000/v1}
       RAG_MODEL_ID: ${RAG_MODEL_ID:-mistral}
-      ENABLE_SMALL_MODEL: ${ENABLE_SMALL_MODEL:-true}
+      ENABLE_SMALL_MODEL: ${ENABLE_SMALL_MODEL:-false}
       SMALL_MODEL_ID: ${SMALL_MODEL_ID:-phi3-mini}
-      SMALL_LLM_ENDPOINT: ${SMALL_LLM_ENDPOINT:-http://vllm-small:8002/v1}
+      SMALL_LLM_ENDPOINT: ${SMALL_LLM_ENDPOINT:-http://vllm-light:8002/v1}
       RAG_TOP_K: ${RAG_TOP_K:-6}
       SMALL_MODEL_TOP_K: ${SMALL_MODEL_TOP_K:-3}
       RAG_MAX_CHUNK_CHARS: ${RAG_MAX_CHUNK_CHARS:-800}
@@ -150,8 +200,18 @@ services:
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
       QDRANT_URL: http://qdrant:6333
       KEYCLOAK_URL: http://keycloak:8080/
-      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
       BYPASS_AUTH: ${BYPASS_AUTH-true}
+      ENABLE_RERANKER: ${ENABLE_RERANKER:-true}
+      MARIADB_HOST: ${MARIADB_HOST:-mariadb}
+      MARIADB_PORT: ${MARIADB_PORT:-3306}
+      MARIADB_DB: ${MARIADB_DB:-rag}
+      MARIADB_USER: ${MARIADB_USER:-rag_user}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
+      DATA_ROOT: /data
+      PUBLIC_GATEWAY_URL: ${PUBLIC_GATEWAY_URL:-http://localhost:8081}
+      ENABLE_INSIGHTS: ${ENABLE_INSIGHTS:-true}
+      ENABLE_INVENTORY: ${ENABLE_INVENTORY:-true}
     networks:
       - rag-net
     depends_on:

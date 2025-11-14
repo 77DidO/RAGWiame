@@ -35,13 +35,13 @@ Deux flux principaux :
 | Authentification | Keycloak 24 | `keycloak` | Realm `rag`, clients OpenID Connect, mapping des rôles vers `service/role` | OIDC 8080/8443 |
 | Orchestration RAG | FastAPI + LlamaIndex + Qdrant Client | `gateway` | Endpoints `/rag/query`, `/v1/chat/completions`, filtrage service/role, transformation OpenAI ↔ pipeline | HTTP 8081 |
 | Modèle de langage (RAG) | vLLM 0.6 + PyTorch + CUDA | `vllm` | Sert `mistralai/Mistral-7B-Instruct-v0.3` (API OpenAI) | HTTP 8000 |
-| Modèle de langage léger | vLLM 0.6 + PyTorch + CUDA | `vllm-small` | Sert `microsoft/Phi-3-mini-4k-instruct` (alias `phi3-mini`) afin de tester le RAG avec un modèle plus compact | HTTP 8002 |
+| Modèle de langage léger (optionnel) | vLLM 0.6 + PyTorch + CUDA | `vllm-light` (profil `light`) | Sert `microsoft/Phi-3-mini-4k-instruct` (alias `phi3-mini`) lorsque la VRAM le permet | HTTP 8002 |
 | Stockage vectoriel | Qdrant 1.9 | `qdrant` | Collection `rag_documents`, filtrage vectoriel + métadonnées | HTTP 6333 |
 | Pipelines données | Scripts Python LlamaIndex | `ingestion`, `indexation` | Nettoyage, chunking, embedding, envoi dans Qdrant | Jobs `docker compose run` |
 | Interface import | FastAPI (upload_ui) | hors compose | Téléversement local, copie vers `data/examples`, déclenchement ingestion/indexation | HTTP 8001 |
 | Base relationnelle | MariaDB 11 | `mariadb` | Source optionnelle pour ingestion SQL (non obligatoire) | 3306 |
 
-> Remarque : lancer simultanément `vllm` (Mistral 7B) et `vllm-small` (Phi-3 mini) consomme la somme de leurs VRAM. Arrêtez le service inutile (`docker compose stop vllm-small`) ou désactivez `ENABLE_SMALL_MODEL` lorsque vous n'évaluez pas le modèle léger.
+> Remarque : lancer simultanément `vllm` (Mistral 7B) et `vllm-light` (Phi-3 mini) consomme la somme de leurs VRAM. N’activez le profil `light` que ponctuellement et laissez `ENABLE_SMALL_MODEL=false` côté Gateway si vous ne servez pas le modèle léger.
 
 ## 3. Flux détaillés
 
@@ -55,7 +55,7 @@ Deux flux principaux :
    - Enregistrement des chunks intermédiaires.
 3. **Job `indexation`** :
    - Chargement des chunks en mémoire.
-   - Embedding via `sentence-transformers/distiluse-base-multilingual-cased-v2`.
+   - Embedding via `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
    - Écriture dans Qdrant (`vectors` + `payload`).
 4. **Qdrant** : la collection conserve les IDs, vecteurs et metadata, permettant :
    - Filtrage par `service/role`.
@@ -76,7 +76,7 @@ Deux flux principaux :
 ## 4. Intégration avec Open WebUI
 
 - Open WebUI est configuré pour utiliser l’endpoint `http://gateway:8081/v1/chat/completions`.
-- Chaque espace ou preset peut pointer soit vers le mode **RAG** (Gateway, `model: "mistral"`), soit vers le **modèle léger** (`model: "phi3-mini"`, toujours via la Gateway), soit, pour un accès direct sans retrieval, vers `http://vllm:8000/v1` ou `http://vllm-small:8002/v1`.
+- Chaque espace ou preset peut pointer soit vers le mode **RAG** (Gateway, `model: "mistral"`), soit vers le **modèle léger** (`model: "phi3-mini"`, toujours via la Gateway), soit, pour un accès direct sans retrieval, vers `http://vllm:8000/v1` ou `http://vllm-light:8002/v1` (profil `light` actif).
 - Les droits utilisateurs sont gérés côté Keycloak : le token OIDC inclut les rôles, et la Gateway peut mapper ces rôles vers les filtres `service/role`.
 - Il est possible d’ajouter un second preset “Mistral direct” pour les questions hors référentiel, sans impacter le flux RAG.
 
@@ -92,7 +92,7 @@ Deux flux principaux :
 
 - **Open WebUI** sert d’interface et consomme la Gateway comme un backend OpenAI.
 - **Gateway FastAPI** agit comme chef d'orchestre : elle parle à Qdrant via LlamaIndex, puis à vLLM pour générer la réponse.
-- **vLLM** encapsule Mistral et fournit les capacités de génération haute performance, tandis qu'un second service `vllm-small` héberge un modèle plus compact. La Gateway peut router les requêtes RAG vers l’un ou l’autre suivant le champ `model`.
+- **vLLM** encapsule Mistral et fournit les capacités de génération haute performance, tandis qu’un second service facultatif `vllm-light` héberge un modèle plus compact lorsque la VRAM le permet. La Gateway ne propose l’alias `phi3-mini` que si `ENABLE_SMALL_MODEL=true`.
 - **Qdrant** conserve la mémoire vectorielle, alimentée par **ingestion/indexation**.
 - **Upload UI** et scripts CLI constituent la porte d’entrée des données.
 - **Keycloak** garantit que seuls les utilisateurs autorisés accèdent aux fonctionnalités en propulsant l’authentification centralisée.

@@ -1,0 +1,139 @@
+Ôò¡ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ Traceback (most recent call last) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò«
+Ôöé in _run_module_as_main:198                                                   Ôöé
+Ôöé Ôò¡ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ locals ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò« Ôöé
+Ôöé Ôöé   alter_argv = True                                                      Ôöé Ôöé
+Ôöé Ôöé         code = <code object <module> at 0x5ac7b328ae80, file             Ôöé Ôöé
+Ôöé Ôöé                "/app/ingestion/classify_cli.py", line 1>                 Ôöé Ôöé
+Ôöé Ôöé main_globals = {                                                         Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__name__': '__main__',                               Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__doc__': 'CLI pour classer les documents ing├®r├®s et Ôöé Ôöé
+Ôöé Ôöé                stocker le r├®sultat dans MariaDB.',                       Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__package__': 'ingestion',                           Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__loader__':                                         Ôöé Ôöé
+Ôöé Ôöé                <_frozen_importlib_external.SourceFileLoader object at    Ôöé Ôöé
+Ôöé Ôöé                0x74b76682c4d0>,                                          Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__spec__': ModuleSpec(name='ingestion.classify_cli', Ôöé Ôöé
+Ôöé Ôöé                loader=<_frozen_importlib_external.SourceFileLoader       Ôöé Ôöé
+Ôöé Ôöé                object at 0x74b76682c4d0>,                                Ôöé Ôöé
+Ôöé Ôöé                origin='/app/ingestion/classify_cli.py'),                 Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__annotations__': {},                                Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__builtins__': <module 'builtins' (built-in)>,       Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__file__': '/app/ingestion/classify_cli.py',         Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__cached__':                                         Ôöé Ôöé
+Ôöé Ôöé                '/app/ingestion/__pycache__/classify_cli.cpython-311.pycÔÇª Ôöé Ôöé
+Ôöé Ôöé                Ôöé   'annotations': _Feature((3, 7, 0, 'beta', 1), None,   Ôöé Ôöé
+Ôöé Ôöé                16777216),                                                Ôöé Ôöé
+Ôöé Ôöé                Ôöé   ... +17                                               Ôöé Ôöé
+Ôöé Ôöé                }                                                         Ôöé Ôöé
+Ôöé Ôöé     mod_name = 'ingestion.classify_cli'                                  Ôöé Ôöé
+Ôöé Ôöé     mod_spec = ModuleSpec(name='ingestion.classify_cli',                 Ôöé Ôöé
+Ôöé Ôöé                loader=<_frozen_importlib_external.SourceFileLoader       Ôöé Ôöé
+Ôöé Ôöé                object at 0x74b76682c4d0>,                                Ôöé Ôöé
+Ôöé Ôöé                origin='/app/ingestion/classify_cli.py')                  Ôöé Ôöé
+Ôöé Ôò░ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò» Ôöé
+Ôöé in _run_code:88                                                              Ôöé
+Ôöé Ôò¡ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ locals ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò« Ôöé
+Ôöé Ôöé       cached = '/app/ingestion/__pycache__/classify_cli.cpython-311.pyc' Ôöé Ôöé
+Ôöé Ôöé         code = <code object <module> at 0x5ac7b328ae80, file             Ôöé Ôöé
+Ôöé Ôöé                "/app/ingestion/classify_cli.py", line 1>                 Ôöé Ôöé
+Ôöé Ôöé        fname = '/app/ingestion/classify_cli.py'                          Ôöé Ôöé
+Ôöé Ôöé init_globals = None                                                      Ôöé Ôöé
+Ôöé Ôöé       loader = <_frozen_importlib_external.SourceFileLoader object at    Ôöé Ôöé
+Ôöé Ôöé                0x74b76682c4d0>                                           Ôöé Ôöé
+Ôöé Ôöé     mod_name = '__main__'                                                Ôöé Ôöé
+Ôöé Ôöé     mod_spec = ModuleSpec(name='ingestion.classify_cli',                 Ôöé Ôöé
+Ôöé Ôöé                loader=<_frozen_importlib_external.SourceFileLoader       Ôöé Ôöé
+Ôöé Ôöé                object at 0x74b76682c4d0>,                                Ôöé Ôöé
+Ôöé Ôöé                origin='/app/ingestion/classify_cli.py')                  Ôöé Ôöé
+Ôöé Ôöé     pkg_name = 'ingestion'                                               Ôöé Ôöé
+Ôöé Ôöé  run_globals = {                                                         Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__name__': '__main__',                               Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__doc__': 'CLI pour classer les documents ing├®r├®s et Ôöé Ôöé
+Ôöé Ôöé                stocker le r├®sultat dans MariaDB.',                       Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__package__': 'ingestion',                           Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__loader__':                                         Ôöé Ôöé
+Ôöé Ôöé                <_frozen_importlib_external.SourceFileLoader object at    Ôöé Ôöé
+Ôöé Ôöé                0x74b76682c4d0>,                                          Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__spec__': ModuleSpec(name='ingestion.classify_cli', Ôöé Ôöé
+Ôöé Ôöé                loader=<_frozen_importlib_external.SourceFileLoader       Ôöé Ôöé
+Ôöé Ôöé                object at 0x74b76682c4d0>,                                Ôöé Ôöé
+Ôöé Ôöé                origin='/app/ingestion/classify_cli.py'),                 Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__annotations__': {},                                Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__builtins__': <module 'builtins' (built-in)>,       Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__file__': '/app/ingestion/classify_cli.py',         Ôöé Ôöé
+Ôöé Ôöé                Ôöé   '__cached__':                                         Ôöé Ôöé
+Ôöé Ôöé                '/app/ingestion/__pycache__/classify_cli.cpython-311.pycÔÇª Ôöé Ôöé
+Ôöé Ôöé                Ôöé   'annotations': _Feature((3, 7, 0, 'beta', 1), None,   Ôöé Ôöé
+Ôöé Ôöé                16777216),                                                Ôöé Ôöé
+Ôöé Ôöé                Ôöé   ... +17                                               Ôöé Ôöé
+Ôöé Ôöé                }                                                         Ôöé Ôöé
+Ôöé Ôöé  script_name = None                                                      Ôöé Ôöé
+Ôöé Ôò░ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò» Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /app/ingestion/classify_cli.py:88 in <module>                                Ôöé
+Ôöé                                                                              Ôöé
+Ôöé   85                                                                         Ôöé
+Ôöé   86                                                                         Ôöé
+Ôöé   87 if __name__ == "__main__":                                              Ôöé
+Ôöé ÔØ▒ 88 Ôöé   app()                                                               Ôöé
+Ôöé   89                                                                         Ôöé
+Ôöé                                                                              Ôöé
+Ôöé Ôò¡ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ locals ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò« Ôöé
+Ôöé Ôöé    annotations = _Feature((3, 7, 0, 'beta', 1), None, 16777216)          Ôöé Ôöé
+Ôöé Ôöé            app = <typer.main.Typer object at 0x74b766443d50>             Ôöé Ôöé
+Ôöé Ôöé DEFAULT_LABELS = (                                                       Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ClassificationLabel(                                Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   label='document_marche',                        Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   description='R├¿glement de consultation, CCAP,   Ôöé Ôöé
+Ôöé Ôöé                  CCTP, avis ou pi├¿ces administratives d├®finissan'+23     Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ),                                                  Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ClassificationLabel(                                Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   label='dqe_bordereau',                          Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   description='D├®tail quantitatif estimatif,      Ôöé Ôöé
+Ôöé Ôöé                  bordereau de prix ou tout document majoritairement'+20  Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ),                                                  Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ClassificationLabel(                                Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   label='memoire_technique',                      Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   description="M├®moire technique, pr├®sentation    Ôöé Ôöé
+Ôöé Ôöé                  d'entreprise, m├®thode, planning ou moyens humain"+12    Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ),                                                  Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ClassificationLabel(                                Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   label='courriel_consultation',                  Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   description="Courrier ├®lectronique ou lettre    Ôöé Ôöé
+Ôöé Ôöé                  courte annon├ºant ou accompagnant l'offre."              Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ),                                                  Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   ClassificationLabel(                                Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   label='etude_plan',                             Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   Ôöé   description='├ëtudes techniques, plans, analyses Ôöé Ôöé
+Ôöé Ôöé                  terrain ou documents graphiques.'                       Ôöé Ôöé
+Ôöé Ôöé                  Ôöé   )                                                   Ôöé Ôöé
+Ôöé Ôöé                  )                                                       Ôöé Ôöé
+Ôöé Ôöé           json = <module 'json' from                                     Ôöé Ôöé
+Ôöé Ôöé                  '/usr/local/lib/python3.11/json/__init__.py'>           Ôöé Ôöé
+Ôöé Ôöé           List = typing.List                                             Ôöé Ôöé
+Ôöé Ôöé       Optional = typing.Optional                                         Ôöé Ôöé
+Ôöé Ôöé             os = <module 'os' (frozen)>                                  Ôöé Ôöé
+Ôöé Ôöé          typer = <module 'typer' from                                    Ôöé Ôöé
+Ôöé Ôöé                  '/usr/local/lib/python3.11/site-packages/typer/__init_ÔÇª Ôöé Ôöé
+Ôöé Ôò░ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò» Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/typer/main.py:326 in __call__        Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/typer/main.py:309 in __call__        Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/typer/main.py:362 in get_command     Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/typer/main.py:579 in                 Ôöé
+Ôöé get_command_from_info                                                        Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/typer/main.py:555 in                 Ôöé
+Ôöé get_params_convertors_ctx_param_name_from_function                           Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/typer/main.py:888 in get_click_param Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/typer/core.py:423 in __init__        Ôöé
+Ôöé                                                                              Ôöé
+Ôöé /usr/local/lib/python3.11/site-packages/click/core.py:2793 in __init__       Ôöé
+Ôò░ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔò»
+TypeError: Secondary flag is not valid for non-boolean flag.
+System.Management.Automation.RemoteException

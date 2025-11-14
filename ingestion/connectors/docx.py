@@ -13,11 +13,18 @@ class DocxConnector(BaseConnector):
 
     document_type = "docx"
 
+    def _iter_docx_files(self, directory: Path) -> Iterable[Path]:
+        iterator = directory.rglob("*.docx") if self.config.recursive else directory.glob("*.docx")
+        for candidate in iterator:
+            if candidate.name.startswith("~$"):
+                continue
+            yield candidate
+
     def discover(self) -> Iterable[Path]:
         for path in self.config.paths:
             if path.is_dir():
-                yield from path.rglob("*.docx") if self.config.recursive else path.glob("*.docx")
-            elif path.suffix.lower() == ".docx":
+                yield from self._iter_docx_files(path)
+            elif path.suffix.lower() == ".docx" and not path.name.startswith("~$"):
                 yield path
 
     def load(self, path: Path) -> Iterable[DocumentChunk]:
