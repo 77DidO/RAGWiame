@@ -70,6 +70,10 @@ class RagPipeline:
             "Question : {question}\n"
         )
         self.qa_prompt = PromptTemplate(self.qa_template)
+        self.chat_prompt = PromptTemplate(
+            "Tu es un assistant francophone polyvalent. Réponds de manière claire et concise.\n"
+            "Question : {question}\n"
+        )
 
     def _select_relevant_text(self, text: str, keywords: List[str]) -> str:
         text = re.sub(r"\s+", " ", text).strip()
@@ -189,6 +193,16 @@ class RagPipeline:
                 }
             )
         return RagQueryResult(answer=str(response), citations=citations)
+
+    def chat_only(self, question: str) -> str:
+        print(f"DEBUG: chat_only called with question: {question}", flush=True)
+        try:
+            response = self.llm.predict(self.chat_prompt, question=question)
+            print(f"DEBUG: chat_only response: '{response}'", flush=True)
+            return str(response)
+        except Exception as e:
+            print(f"DEBUG: chat_only error: {e}", flush=True)
+            return f"Error: {e}"
 
     @staticmethod
     def _citation_key(source: str, chunk_value) -> str:

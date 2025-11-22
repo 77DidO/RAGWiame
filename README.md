@@ -51,6 +51,12 @@ Ports exposés :
 
 ## Utilisation des API
 
+- **Configurer Open WebUI la première fois** :
+  1. Rendez-vous sur `http://localhost:8080` (auth Keycloak). Si la page est vide après un rebuild, forcez un `Ctrl+F5`.
+ 2. Dans “Sélectionnez un modèle”, créez un preset `Mistral RAG` en pointant vers `http://gateway:8081/v1` (model `mistral`) et définissez-le comme valeur par défaut.
+ 3. Pour un mode “chat direct”, dupliquez le preset et ajoutez dans les paramètres avancés `{"metadata":{"use_rag":false}}` ou bien forcez ce mode globalement via l’option `DEFAULT_USE_RAG=false` côté Gateway (voir plus bas).
+  4. Les données sont stockées dans `openwebui_data`, vous n’aurez plus à refaire ces étapes après un redémarrage.
+
 ### RAG natif
 
 ```bash
@@ -74,6 +80,20 @@ curl -X POST http://localhost:8081/v1/chat/completions \
 ```
 
 La Gateway convertit automatiquement la requête en question RAG, récupère les chunks pertinents puis appelle vLLM. Utilisez `/v1/models` pour vérifier la disponibilité de `mistral`.
+
+### Mode conversation (sans RAG)
+
+La Gateway comprend un flag `use_rag` pour ignorer la partie retrieval quand vous voulez un simple échange “chat” avec Mistral :
+
+```bash
+curl -X POST http://localhost:8081/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Parle-moi du projet","use_rag":false}'
+```
+
+Sur `/v1/chat/completions`, ajoutez `metadata.use_rag=false` dans la payload. Dans Open WebUI, créez un preset qui envoie ce champ dans la section “Advanced/Extra parameters” (à défaut d’un toggle natif) ou fixez `DEFAULT_USE_RAG=false` côté Gateway pour que toutes les requêtes soient en “chat direct” par défaut.
+
+> Astuce : ajoutez `#norag` ou `rag:false` dans la question pour forcer le mode “chat direct”, et `#forcerag` / `rag:true` pour forcer le RAG. La Gateway nettoie ces directives avant d’envoyer la requête au LLM.
 
 ### Accès direct au modèle
 

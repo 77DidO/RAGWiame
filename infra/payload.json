@@ -1,0 +1,12 @@
+{
+    "model": "mistral",
+    "messages": [
+        {
+            "role": "user",
+            "content": "test"
+        }
+    ],
+    "metadata": {
+        "use_rag": false
+    }
+}

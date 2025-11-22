@@ -31,6 +31,7 @@ Cette page détaille les variables d’environnement et paramètres importants. 
 | `RAG_TOP_K` | Nombre de chunks remontés pour le modèle principal | 6 |
 | `SMALL_MODEL_TOP_K` | Nombre de chunks pour le modèle léger (Phi‑3, etc.) | 3 |
 | `RAG_MAX_CHUNK_CHARS` | Tronque chaque chunk à N caractères après normalisation (espace unique) | 800 |
+| `DEFAULT_USE_RAG` | Valeur par défaut si ni `use_rag` ni directives ne sont fournies (`true` = pipeline complet, `false` = “chat direct”). | `true` |
 | `ENABLE_INSIGHTS` | Active l’utilisation des montants extraits (table `document_insights`). | `true` |
 | `ENABLE_INVENTORY` | Active l’inventaire des documents (table `document_inventory`). | `true` |
 
@@ -56,6 +57,27 @@ Ajustez `RAG_TOP_K` / `SMALL_MODEL_TOP_K` pour contrôler la profondeur avant re
 | `MARIADB_HOST`, `MARIADB_PORT`, `MARIADB_DB`, `MARIADB_USER`, `MARIADB_PASSWORD` | Paramètres utilisés par la Gateway pour interroger la table `document_insights` (montants DQE). | `mariadb`, `3306`, `rag`, `rag_user`, `changeme` |
 
 > ⚠️ Pour que `phi3-mini` apparaisse dans `/v1/models`, il faut **à la fois** que `ENABLE_SMALL_MODEL=true` et que le service optionnel `vllm-light` soit en cours d’exécution (`docker compose --profile light up -d vllm-light`).
+
+### Activer / désactiver RAG par requête
+
+- `use_rag` dans `/rag/query` (`DEFAULT_USE_RAG` définit la valeur par défaut).
+- `metadata.use_rag` dans `/v1/chat/completions`.
+- `true` ⇒ pipeline complet (inventory + insights + Qdrant + citations).
+- `false` ⇒ réponse “chat” directe (Mistral sans retrieval, pas de citation).
+- Directives rapides : insérez `#norag` / `rag:false` dans la question pour désactiver RAG, `#forcerag` / `rag:true` pour le réactiver (les mots-clés sont supprimés avant l’envoi au LLM).
+- `DEFAULT_USE_RAG=false` permet de rendre ce mode “chat direct” par défaut pour toutes les requêtes qui ne précisent rien ; les directives ou champs `use_rag` restent prioritaires le cas échéant.
+
+```bash
+curl -X POST http://localhost:8081/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Parle-moi du projet","use_rag":false}'
+```
+
+```bash
+curl -X POST http://localhost:8081/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"mistral","metadata":{"use_rag":false},"messages":[{"role":"user","content":"Bonjour"}]}'
+```
 
 ## Exemple de bloc `gateway` (docker compose)
 

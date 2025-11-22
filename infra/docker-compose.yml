@@ -60,7 +60,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     volumes:
       - mistral_models:/models
     networks:
@@ -94,14 +94,14 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     volumes:
       - small_models:/models
     networks:
       - rag-net
     depends_on:
       - qdrant
-    profiles: ["light"]
+    profiles: [ "light" ]
 
   ingestion:
     build:
@@ -121,7 +121,7 @@ services:
     build:
       context: ../ingestion
       dockerfile: Dockerfile
-    entrypoint: ["python", "-m", "ingestion.insights_cli"]
+    entrypoint: [ "python", "-m", "ingestion.insights_cli" ]
     environment:
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
     volumes:
@@ -135,7 +135,7 @@ services:
     build:
       context: ../ingestion
       dockerfile: Dockerfile
-    entrypoint: ["python", "-m", "ingestion.inventory_cli"]
+    entrypoint: [ "python", "-m", "ingestion.inventory_cli" ]
     environment:
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
     volumes:
@@ -149,7 +149,7 @@ services:
     build:
       context: ../ingestion
       dockerfile: Dockerfile
-    entrypoint: ["python", "-m", "ingestion.classify_cli"]
+    entrypoint: [ "python", "-m", "ingestion.classify_cli" ]
     environment:
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
       CLASSIFIER_API_BASE: ${CLASSIFIER_API_BASE:-http://vllm:8000/v1}
@@ -186,6 +186,7 @@ services:
       - "8081:8081"
     volumes:
       - ../data/examples:/data:ro
+      - ../llm_pipeline:/app/llm_pipeline
     environment:
       VLLM_ENDPOINT: ${VLLM_ENDPOINT:-http://vllm:8000/v1}
       RAG_MODEL_ID: ${RAG_MODEL_ID:-mistral}
@@ -201,8 +202,9 @@ services:
       QDRANT_URL: http://qdrant:6333
       KEYCLOAK_URL: http://keycloak:8080/
       HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-      BYPASS_AUTH: ${BYPASS_AUTH-true}
+      BYPASS_AUTH: "true"
       ENABLE_RERANKER: ${ENABLE_RERANKER:-true}
+      DEFAULT_USE_RAG: ${DEFAULT_USE_RAG:-true}
       MARIADB_HOST: ${MARIADB_HOST:-mariadb}
       MARIADB_PORT: ${MARIADB_PORT:-3306}
       MARIADB_DB: ${MARIADB_DB:-rag}
@@ -220,16 +222,22 @@ services:
       - keycloak
 
   openwebui:
-    image: ghcr.io/open-webui/open-webui:main
+    build:
+      context: ../open-webui
+      dockerfile: Dockerfile
+      args:
+        OLLAMA_BASE_URL: '/ollama'
     ports:
       - "8080:8080"
+    volumes:
+      - ../openwebui_data:/app/backend/data
+      - ../open-webui/backend:/app/backend
+      - ../open-webui/build:/app/build
     environment:
-      OAUTH_PROVIDER: keycloak
-      OAUTH_CLIENT_ID: rag-webui
-      OAUTH_CLIENT_SECRET: change-me
-      OAUTH_AUTH_URL: http://keycloak:8080/realms/rag/protocol/openid-connect/auth
-      OAUTH_TOKEN_URL: http://keycloak:8080/realms/rag/protocol/openid-connect/token
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me}
+      OAUTH_PROVIDER: none
       API_BASE_URL: http://gateway:8081
+      ENABLE_SIGNUP: "true"
     networks:
       - rag-net
     depends_on:
@@ -241,6 +249,7 @@ volumes:
   qdrant_data:
   mistral_models:
   small_models:
+
 
 networks:
   rag-net:

@@ -7,10 +7,11 @@ import time
 import uuid
 from functools import lru_cache
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import OAuth2AuthorizationCodeBearer
 from fastapi.responses import FileResponse
 from llama_index.core import VectorStoreIndex
@@ -39,6 +40,12 @@ if SMALL_MODEL_ENABLED:
 ENABLE_RERANKER = os.getenv("ENABLE_RERANKER", "true").lower() in {"1", "true", "yes"}
 DATA_ROOT = Path(os.getenv("DATA_ROOT", "/data")).resolve()
 PUBLIC_GATEWAY_URL = os.getenv("PUBLIC_GATEWAY_URL", "http://localhost:8081").rstrip("/")
+DEFAULT_USE_RAG = os.getenv("DEFAULT_USE_RAG", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 app = FastAPI(title="RAGWiame Gateway", version="0.1.0")
 insight_service = DocumentInsightService()
@@ -57,6 +64,7 @@ class QueryPayload(BaseModel):
     question: str
     service: Optional[str] = ""
     role: Optional[str] = ""
+    use_rag: Optional[bool] = None
 
 
 DEFAULT_SERVICE = os.getenv("DEFAULT_RAG_SERVICE", "").strip()
@@ -91,6 +99,7 @@ class ChatRequest(BaseModel):
     model: str
     messages: List[ChatMessage]
     stream: Optional[bool] = False
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class ChatChoice(BaseModel):
@@ -158,6 +167,10 @@ def _build_filters(payload: QueryPayload) -> MetadataFilters:
 
 
 def _execute_query(payload: QueryPayload, model_id: str) -> QueryResponse:
+    question_text, use_rag = _resolve_rag_mode(payload.question, payload.use_rag)
+    if use_rag is False:
+        return _llm_only_answer(question_text, model_id)
+    payload.question = question_text
     inventory = inventory_service.try_answer(payload.question)
     if inventory:
         enriched_answer = _append_citations_text(inventory["answer"], inventory["citations"])
@@ -172,11 +185,53 @@ def _execute_query(payload: QueryPayload, model_id: str) -> QueryResponse:
     return QueryResponse(answer=enriched_answer, citations=result.citations)
 
 
+def _llm_only_answer(question: str, model_id: str) -> QueryResponse:
+    pipeline = get_pipeline(model_id)
+    answer_text = pipeline.chat_only(question)
+    return QueryResponse(answer=answer_text, citations=[])
+
+
 def _ensure_token(token: Optional[str]) -> None:
     if BYPASS_AUTH:
         return
     if not token:
         raise HTTPException(status_code=401, detail="Token invalide")
+
+
+def _normalize_bool(value: Any, default: bool | None = True) -> bool | None:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes", "on"}:
+            return True
+        if lowered in {"false", "0", "no", "off"}:
+            return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+_DISABLE_RAG_PATTERNS = [r"#norag\b", r"\[norag\]", r"rag\s*:\s*false"]
+_ENABLE_RAG_PATTERNS = [r"#forcerag\b", r"#userag\b", r"\[rag\]", r"rag\s*:\s*true"]
+
+
+def _resolve_rag_mode(question: str, explicit: Optional[bool]) -> tuple[str, bool]:
+    decision = explicit
+    cleaned = question
+    for pattern in _DISABLE_RAG_PATTERNS:
+        if re.search(pattern, cleaned, flags=re.IGNORECASE):
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+            decision = False
+    for pattern in _ENABLE_RAG_PATTERNS:
+        if re.search(pattern, cleaned, flags=re.IGNORECASE):
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+            decision = True
+    if decision is None:
+        decision = DEFAULT_USE_RAG
+    return cleaned.strip(), decision
 
 
 def _append_citations_text(answer: str, citations: List[Dict[str, Any]]) -> str:
@@ -194,11 +249,12 @@ def _append_citations_text(answer: str, citations: List[Dict[str, Any]]) -> str:
         unique.append(citation)
     if not unique:
         return answer
-    block_lines = ["> **Références :**"]
+    block_lines = ["> Références :"]
     for idx, citation in enumerate(unique, start=1):
         link = _format_reference_link(citation)
         snippet = _format_citation_snippet(citation)
-        block_lines.append(f"> {idx}. {link}")
+        line = f"> {idx}. {link}"
+        block_lines.append(line)
         if snippet:
             block_lines.append(f">    ↳ {snippet}")
     joined = "\n".join(block_lines)
@@ -234,8 +290,8 @@ def _format_citation_snippet(citation: Dict[str, Any]) -> str:
     if normalized_chunk and normalized_chunk == normalized_snippet:
         return ""
     snippet = " ".join(snippet.split())
-    if len(snippet) > 320:
-        snippet = snippet[:320].rstrip() + "…"
+    if len(snippet) > 120:
+        snippet = snippet[:120].rstrip() + "…"
     return snippet
 
 
@@ -295,7 +351,7 @@ async def view_file(path: str):
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(
-    request: ChatRequest, token: Optional[str] = Depends(oauth2_scheme)
+    request: ChatRequest, raw_request: Request, token: Optional[str] = Depends(oauth2_scheme)
 ) -> ChatCompletionResponse:
     """Compatibilité OpenAI Chat Completions (RAG quel que soit le modèle)."""
     _ensure_token(token)
@@ -308,11 +364,25 @@ async def chat_completions(
     if not last_user_msg:
         raise HTTPException(status_code=400, detail="at least one user message is required")
 
+    # Read use_rag from header (priority) or metadata (fallback)
+    use_rag_header = raw_request.headers.get('x-use-rag')
+    print(f"DEBUG: X-Use-RAG header: {use_rag_header}", flush=True)
+    
+    if use_rag_header is not None:
+        use_rag = _normalize_bool(use_rag_header)
+    else:
+        use_rag = _normalize_bool(
+            request.metadata.get("use_rag") if request.metadata else None, default=None
+        )
+
     payload = QueryPayload(
         question=last_user_msg.content,
         service=DEFAULT_SERVICE,
         role=DEFAULT_ROLE,
+        use_rag=use_rag,
     )
+    print(f"DEBUG: Incoming metadata: {request.metadata}", flush=True)
+    print(f"DEBUG: Resolved use_rag: {payload.use_rag}", flush=True)
     result = _execute_query(payload, request.model)
 
     response_message = ChatMessage(role="assistant", content=result.answer)
