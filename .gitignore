@@ -9,3 +9,4 @@ data/examples/*
 .idea/
 .vscode/
 .DS_Store
+openwebui_data/
