@@ -47,7 +47,15 @@ class DocumentInsightService:
 
     def _question_targets_totals(self, question: str) -> bool:
         text = question.lower()
-        return any(keyword in text for keyword in self.TOTAL_KEYWORDS)
+        # Only trigger if asking for global/project totals or DQE specifically
+        triggers = [
+            "montant total", "coût total", "cout total", 
+            "budget total", "montant global", "coût global", 
+            "cout global", "montant dqe", "total dqe",
+            "montant du projet", "coût du projet", "cout du projet",
+            "budget du projet"
+        ]
+        return any(trigger in text for trigger in triggers)
 
     def _connect(self) -> mariadb.Connection:
         return mariadb.connect(
