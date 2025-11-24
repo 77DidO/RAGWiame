@@ -20,5 +20,6 @@ RUN pip install --upgrade pip \
 
 COPY ingestion /app/ingestion
 COPY indexation /app/indexation
+COPY llm_pipeline /app/llm_pipeline
 
 ENTRYPOINT ["python", "-m", "indexation.qdrant_indexer"]

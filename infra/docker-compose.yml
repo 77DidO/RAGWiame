@@ -34,6 +34,19 @@ services:
     networks:
       - rag-net
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - rag-net
+
   vllm:
     image: vllm/vllm-openai:latest
     command:
@@ -171,12 +184,14 @@ services:
     environment:
       QDRANT_URL: http://qdrant:6333
       HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      ELASTIC_HOST: http://elasticsearch:9200
     volumes:
       - ../data/examples:/data:ro
     networks:
       - rag-net
     depends_on:
       - qdrant
+      - elasticsearch
 
   gateway:
     build:
@@ -200,6 +215,12 @@ services:
       LLM_TIMEOUT: ${LLM_TIMEOUT:-150}
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
       QDRANT_URL: http://qdrant:6333
+      ELASTIC_HOST: ${ELASTIC_HOST:-http://elasticsearch:9200}
+      ELASTIC_INDEX: ${ELASTIC_INDEX:-rag_documents}
+      HYBRID_FUSION: ${HYBRID_FUSION:-rrf}
+      HYBRID_WEIGHT_VECTOR: ${HYBRID_WEIGHT_VECTOR:-0.6}
+      HYBRID_WEIGHT_KEYWORD: ${HYBRID_WEIGHT_KEYWORD:-0.4}
+      HYBRID_BM25_TOP_K: ${HYBRID_BM25_TOP_K:-10}
       KEYCLOAK_URL: http://keycloak:8080/
       HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
       BYPASS_AUTH: "true"
@@ -219,6 +240,7 @@ services:
     depends_on:
       - vllm
       - qdrant
+      - elasticsearch
       - keycloak
 
   openwebui:
@@ -231,13 +253,13 @@ services:
       - "8080:8080"
     volumes:
       - ../openwebui_data:/app/backend/data
-      - ../open-webui/backend:/app/backend
-      - ../open-webui/build:/app/build
     environment:
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me}
       OAUTH_PROVIDER: none
-      API_BASE_URL: http://gateway:8081
+      API_BASE_URL: http://gateway:8081/v1
       ENABLE_SIGNUP: "true"
+      CORS_ALLOW_ORIGIN: 'http://localhost:5700;http://127.0.0.1:5700'
+
     networks:
       - rag-net
     depends_on:
@@ -248,6 +270,7 @@ volumes:
   mariadb_data:
   qdrant_data:
   mistral_models:
+  esdata:
   small_models:
 
 
