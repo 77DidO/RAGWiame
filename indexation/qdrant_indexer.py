@@ -1,6 +1,8 @@
 """Service d'indexation Qdrant orchestré par LlamaIndex."""
 from __future__ import annotations
 
+print("DEBUG: qdrant_indexer script early start", flush=True)
+
 import os
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -9,6 +11,7 @@ import typer
 from ingestion.cli import _load_config as load_ingestion_config
 from ingestion.config import IngestionConfig
 from ingestion.pipeline import IngestionPipeline
+from llm_pipeline.elastic_client import index_document as es_index_document
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
@@ -48,6 +51,27 @@ def _build_documents(chunks: Sequence) -> List[Document]:
     ]
 
 
+def _build_es_body(chunk) -> dict:
+    """Prépare le document Elasticsearch avec le texte et les métadonnées utiles."""
+    metadata = dict(chunk.metadata)
+    metadata.pop("content", None)
+    body = {
+        "content": chunk.text,
+    }
+    for key in ("source", "service", "role", "doc_hint", "chunk_index", "page"):
+        if key in metadata:
+            body[key] = metadata[key]
+    # On conserve le reste des métadonnées pour faciliter le debug (si JSON-serialisable)
+    for key, value in metadata.items():
+        if key in body:
+            continue
+        try:
+            body[key] = value
+        except Exception:
+            body[key] = str(value)
+    return body
+
+
 app = typer.Typer(add_completion=False)
 
 
@@ -59,7 +83,7 @@ def main(
     embedding_model: Optional[str] = typer.Option(None, help="Modèle d'embedding HuggingFace"),
 ) -> None:
     """Exécute l'ingestion puis indexe les documents dans Qdrant."""
-
+    print("DEBUG: qdrant_indexer script started", flush=True)
     env_path = os.getenv("INGESTION_CONFIG_PATH")
     if config_path is None and env_path:
         config_path = Path(env_path)
@@ -74,10 +98,30 @@ def main(
         typer.echo("Aucun document détecté durant l'ingestion. Vérifiez la configuration.")
         raise typer.Exit(code=0)
 
+    # Indexation Qdrant
     documents = _build_documents(chunks)
-    indexer = QdrantIndexer(qdrant_url=qdrant_url, collection_name=collection_name, embedding_model=embedding_model)
+    indexer = QdrantIndexer(
+        qdrant_url=qdrant_url, collection_name=collection_name, embedding_model=embedding_model
+    )
     indexer.index_documents(documents)
     typer.echo(f"{len(documents)} documents indexés dans la collection '{collection_name}'.")
+
+    # Indexation Elasticsearch (BM25)
+    failures = 0
+    for chunk in chunks:
+        body = _build_es_body(chunk)
+        try:
+            print(f"DEBUG: Indexing chunk {chunk.id} into Elasticsearch", flush=True)
+            es_index_document(str(chunk.id), body=body)
+            print(f"DEBUG: Successfully indexed chunk {chunk.id}", flush=True)
+        except Exception as exc:  # pragma: no cover - dépend de la dispo ES
+            failures += 1
+            typer.echo(f"[AVERTISSEMENT] Indexation Elasticsearch échouée pour {chunk.id}: {exc}")
+
+    if failures:
+        typer.echo(f"{failures} fragments n'ont pas pu être indexés dans Elasticsearch.")
+    else:
+        typer.echo("Indexation Elasticsearch terminée.")
 
 
 if __name__ == "__main__":

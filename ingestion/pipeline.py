@@ -62,8 +62,13 @@ class IngestionPipeline:
     def _split_text(self, text: str) -> List[str]:
         size = self.config.chunk_size
         overlap = self.config.chunk_overlap
+        # Validation des paramètres pour éviter les boucles infinies
         if size <= 0:
-            return [text]
+            raise ValueError("chunk_size must be a positive integer")
+        if overlap >= size:
+            raise ValueError("chunk_overlap must be less than chunk_size")
+        # Log de debug pour vérifier les valeurs utilisées
+        print(f"DEBUG: _split_text size={size} overlap={overlap}", flush=True)
         if len(text) <= size:
             return [text]
 

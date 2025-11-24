@@ -7,6 +7,12 @@ from typing import Iterable
 from ingestion.config import ConnectorConfig, ExcelConnectorOptions
 from ingestion.connectors.base import BaseConnector, DocumentChunk
 
+try:
+    import pandas as pd
+except ImportError:
+    pd = None  # Sera vérifié dans load()
+
+
 
 class ExcelConnector(BaseConnector):
     """Découpe les classeurs Excel par onglet et par bloc tabulaire."""
@@ -36,22 +42,62 @@ class ExcelConnector(BaseConnector):
             if self.options.sheet_whitelist
             else excel_file.sheet_names
         )
+        # Validation du chunk_size
+        chunk_size = getattr(self.options, "chunk_size", 10)
+        if chunk_size <= 0:
+            raise ValueError("ExcelConnector chunk_size must be a positive integer")
+        # Log de debug
+        print(f"DEBUG: ExcelConnector.load path={path} chunk_size={chunk_size}", flush=True)
+        
         for sheet_name in sheet_names:
             dataframe = excel_file.parse(sheet_name)
             dataframe = self._truncate(dataframe)
             if dataframe.empty:
                 continue
-            text = dataframe.to_csv(index=False)
-            metadata = {
-                "source": str(path),
-                "sheet": sheet_name,
-                "document_type": self.document_type,
-            }
-            yield DocumentChunk(
-                id=f"{path.stem}-{sheet_name}",
-                text=text,
-                metadata=metadata,
-            )
+            
+            headers = dataframe.columns.tolist()
+            
+            # Générer un chunk par bloc de lignes
+            for chunk_idx, start_row in enumerate(range(0, len(dataframe), chunk_size)):
+                end_row = min(start_row + chunk_size, len(dataframe))
+                chunk_df = dataframe.iloc[start_row:end_row]
+                
+                # Convertir en texte lisible avec contexte
+                lines = []
+                lines.append(f"Sheet: {sheet_name}")
+                lines.append(f"Rows {start_row+1}-{end_row} of {len(dataframe)}")
+                lines.append("")
+                
+                # Ajouter les données ligne par ligne avec les en-têtes
+                for row_idx, row in chunk_df.iterrows():
+                    row_lines = []
+                    for col_name in headers:
+                        value = row[col_name]
+                        # Filtrer les valeurs vides ou NaN
+                        if pd.notna(value) and str(value).strip():
+                            row_lines.append(f"{col_name}: {value}")
+                    if row_lines:  # Seulement si la ligne a des données
+                        lines.append(f"Row {row_idx + 1}:")
+                        lines.extend([f"  - {line}" for line in row_lines])
+                        lines.append("")
+                
+                text = "\n".join(lines)
+                
+                # Ne créer un chunk que s'il y a des données
+                if len(lines) > 3:  # Plus que juste l'en-tête
+                    metadata = {
+                        "source": str(path),
+                        "sheet": sheet_name,
+                        "document_type": self.document_type,
+                        "chunk_index": chunk_idx,
+                        "start_row": start_row + 1,
+                        "end_row": end_row,
+                    }
+                    yield DocumentChunk(
+                        id=f"{path.stem}-{sheet_name}-chunk{chunk_idx}",
+                        text=text,
+                        metadata=metadata,
+                    )
 
     def _truncate(self, dataframe: "pd.DataFrame") -> "pd.DataFrame":
         rows = self.options.max_rows
