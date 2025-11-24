@@ -123,7 +123,16 @@ Variables utiles (`infra/docker-compose.yml`) :
 - `ENABLE_SMALL_MODEL` : permet de masquer l’option côté Gateway lorsqu’il n’est pas lancé.
 - `SMALL_MODEL_ID` : valeur attendue dans le champ `model` (doit correspondre à `--served-model-name`).
 
-> ⚠️ Attention : lancer simultanément Mistral 7B et Phi-3 mini consomme la somme de leurs VRAM. Si votre carte ne le permet pas, laissez `ENABLE_SMALL_MODEL=false` et n’activez le profil `light` (`vllm-light`) que ponctuellement.
+> ⚠️ Attention : lancer simultanément Mistral 7B et Phi-3 mini consomme la somme de leurs VRAM. Si votre carte ne le permet pas, laissez `ENABLE_SMALL_MODEL=false` et n'activez le profil `light` (`vllm-light`) que ponctuellement.
+
+### Recherche hybride (Qdrant + Elasticsearch)
+
+- Service `elasticsearch` ajouté dans `infra/docker-compose.yml` (port 9200, `xpack.security.enabled=false` en dev). Variables : `ELASTIC_HOST` (défaut `http://elasticsearch:9200`), `ELASTIC_INDEX` (`rag_documents`).
+- Ingestion/indexation : chaque chunk est indexé dans Qdrant **et** Elasticsearch avec `content`, `source`, `service`, `role`, `doc_hint`, `chunk_index`, `page`.
+- Gateway : endpoint `POST /v1/hybrid/search` (réponse RAG complète) et option `return_hits_only=true` pour ne retourner que la liste fusionnée des documents.
+- OpenAI-like : ajouter l'en-tête `X-Hybrid-Search: true` sur `/v1/chat/completions` ou appeler `/v1/hybrid/completions` (Open WebUI relaie cet en-tête vers la Gateway).
+- Fusion : `HYBRID_FUSION=rrf` par défaut (Reciprocal Rank Fusion). Mode pondéré via `HYBRID_FUSION=weighted` + `HYBRID_WEIGHT_VECTOR` / `HYBRID_WEIGHT_KEYWORD`. Taille BM25 configurable (`HYBRID_BM25_TOP_K`).
+- Sécurité prod : activer xpack/API key ou cloisonner le réseau ; le mode sans auth est réservé au développement.
 
 ## Ingestion et indexation
 
