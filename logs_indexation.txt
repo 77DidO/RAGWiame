@@ -1,2 +1,0 @@
- Container infra-qdrant-1  Running
-1200 documents indexés dans la collection 'rag_documents'.
