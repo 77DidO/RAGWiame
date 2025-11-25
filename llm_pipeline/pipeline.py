@@ -73,9 +73,9 @@ class RagPipeline:
             "- Réponds à la question en français, de manière claire et structurée.\n"
             "- Utilise des phrases complètes et un ton naturel.\n"
             "- Cite tes sources en utilisant les numéros entre crochets [1], [2], etc. présents dans le contexte.\n"
-            "- Si plusieurs informations sont trouvées, présente-les de façon organisée.\n"
-            "- Si le contexte ne contient pas l'information demandée, réponds exactement : "
-            "\"Je n'ai pas trouvé l'information dans les documents.\"\n\n"
+            "- Si la réponse contient des montants, précise toujours la devise (ex: EUR) et utilise un format lisible (ex: 220 792 EUR).\n"
+            "- Si le contexte contient des informations partielles ou approchantes, utilise-les en précisant les limites.\n"
+            "- Si le contexte ne contient vraiment aucune information pertinente, indique-le poliment.\n\n"
             "Contexte pertinent :\n{context}\n\n"
             "Question : {question}\n"
         )

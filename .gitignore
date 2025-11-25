@@ -10,3 +10,10 @@ data/examples/*
 .vscode/
 .DS_Store
 openwebui_data/
+
+# Fichiers temporaires et de debug
+*.zip
+test_results*.txt
+debug_*.py
+test_*_extraction.py
+.backup/

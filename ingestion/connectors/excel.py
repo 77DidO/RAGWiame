@@ -75,7 +75,29 @@ class ExcelConnector(BaseConnector):
                         value = row[col_name]
                         # Filtrer les valeurs vides ou NaN
                         if pd.notna(value) and str(value).strip():
-                            row_lines.append(f"{col_name}: {value}")
+                            # Gestion des en-têtes "Unnamed"
+                            header_str = str(col_name)
+                            is_unnamed = header_str.startswith("Unnamed")
+                            
+                            # Formatage des nombres (ajout de variantes avec espaces pour le RAG)
+                            val_str = str(value)
+                            if isinstance(value, (int, float)):
+                                try:
+                                    # Créer une version avec séparateur de milliers (espace)
+                                    # Ex: 220792.79 -> "220 792"
+                                    int_val = int(value)
+                                    if int_val > 999:
+                                        space_fmt = f"{int_val:_}".replace("_", " ")
+                                        val_str = f"{value} (format lisible: {space_fmt})"
+                                except Exception:
+                                    pass
+
+                            if is_unnamed:
+                                # Si pas d'en-tête, on met juste la valeur
+                                row_lines.append(f"{val_str}")
+                            else:
+                                row_lines.append(f"{header_str}: {val_str}")
+                                
                     if row_lines:  # Seulement si la ligne a des données
                         lines.append(f"Row {row_idx + 1}:")
                         lines.extend([f"  - {line}" for line in row_lines])
