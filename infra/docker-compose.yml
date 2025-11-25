@@ -252,7 +252,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ../openwebui_data_fix:/app/backend/data
+      - ../openwebui_data:/app/backend/data
     environment:
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me}
       OAUTH_PROVIDER: none
