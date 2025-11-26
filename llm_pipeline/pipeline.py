@@ -14,6 +14,15 @@ from llama_index.llms.openai_like import OpenAILike
 from sentence_transformers import CrossEncoder
 
 from llm_pipeline.elastic_client import bm25_search
+from llm_pipeline.query_classification import classify_query_type
+from llm_pipeline.prompts import (
+    get_default_prompt,
+    get_chat_prompt,
+    get_fiche_prompt,
+    get_chiffres_prompt,
+)
+from llm_pipeline.context_formatting import format_context
+from llm_pipeline.retrieval import hybrid_query as pipeline_hybrid_query
 
 HYBRID_FUSION = os.getenv("HYBRID_FUSION", "rrf").strip().lower()
 HYBRID_WEIGHT_VECTOR = float(os.getenv("HYBRID_WEIGHT_VECTOR", "0.6"))
@@ -68,22 +77,12 @@ class RagPipeline:
                 default_activation_function=None,
                 max_length=512,
             )
-        self.qa_template = (
-            "Tu es un assistant professionnel et bienveillant.\n"
-            "- Réponds à la question en français, de manière claire et structurée.\n"
-            "- Utilise des phrases complètes et un ton naturel.\n"
-            "- Cite tes sources en utilisant les numéros entre crochets [1], [2], etc. présents dans le contexte.\n"
-            "- Si la réponse contient des montants, précise toujours la devise (ex: EUR) et utilise un format lisible (ex: 220 792 EUR).\n"
-            "- Si le contexte contient des informations partielles ou approchantes, utilise-les en précisant les limites.\n"
-            "- Si le contexte ne contient vraiment aucune information pertinente, indique-le poliment.\n\n"
-            "Contexte pertinent :\n{context}\n\n"
-            "Question : {question}\n"
-        )
-        self.qa_prompt = PromptTemplate(self.qa_template)
-        self.chat_prompt = PromptTemplate(
-            "Tu es un assistant francophone polyvalent. Réponds de manière claire et concise.\n"
-            "Question : {question}\n"
-        )
+
+        # Prompts pour les différents types de questions
+        self.qa_prompt = PromptTemplate(get_default_prompt())
+        self.qa_prompt_fiche = PromptTemplate(get_fiche_prompt())
+        self.qa_prompt_chiffres = PromptTemplate(get_chiffres_prompt())
+        self.chat_prompt = PromptTemplate(get_chat_prompt())
 
     def _metadata_filters_to_dict(self, filters: MetadataFilters | None) -> Dict[str, str]:
         if not filters or not getattr(filters, "filters", None):
@@ -370,6 +369,8 @@ class RagPipeline:
         
         question_lower = question.lower().strip()
         print(f"DEBUG: Checking vague question: '{question_lower}'", flush=True)
+        question_type = classify_query_type(question_lower)
+        print(f"DEBUG: Detected question type: {question_type}", flush=True)
         
         for pattern in vague_patterns:
             if re.match(pattern, question_lower):
@@ -385,7 +386,7 @@ class RagPipeline:
 
         hits: Optional[List[Dict[str, Any]]] = None
         if use_hybrid:
-            nodes, hits = self._hybrid_query(question, filters=filters)
+            nodes, hits = pipeline_hybrid_query(self, question, filters=filters)
             query_text = question
             if return_hits_only:
                 return RagQueryResult(answer="", citations=[], hits=hits)
@@ -404,7 +405,7 @@ class RagPipeline:
         reranked = self._cross_encoder_rerank(nodes, query_text)
         
         # Check relevance threshold
-        MIN_RELEVANCE_SCORE = 0.1  # Lowered to 0.1 to capture more results
+        MIN_RELEVANCE_SCORE = float(os.getenv("MIN_RELEVANCE_SCORE", "0.1"))
         
         print(f"DEBUG: Reranked nodes scores:", flush=True)
         for i, node in enumerate(reranked[:5]):
@@ -423,9 +424,23 @@ class RagPipeline:
                 hits=hits,
             )
 
-        context_text, snippet_map = self._format_context(relevant_nodes, question)
+        context_text, snippet_map = format_context(
+            relevant_nodes,
+            question,
+            max_chunk_chars=self.max_chunk_chars,
+            top_k=self.top_k,
+        )
+
+        # Choisir le prompt adapté au type de question
+        if question_type == "fiche_identite":
+            qa_prompt = self.qa_prompt_fiche
+        elif question_type == "question_chiffree":
+            qa_prompt = self.qa_prompt_chiffres
+        else:
+            qa_prompt = self.qa_prompt
+
         response = self.llm.predict(
-            self.qa_prompt,
+            qa_prompt,
             context=context_text,
             question=question,
         )
