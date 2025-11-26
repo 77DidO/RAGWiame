@@ -203,38 +203,38 @@ services:
       - ../data/examples:/data:ro
       - ../llm_pipeline:/app/llm_pipeline
     environment:
-      VLLM_ENDPOINT: ${VLLM_ENDPOINT:-http://vllm:8000/v1}
-      RAG_MODEL_ID: ${RAG_MODEL_ID:-mistral}
-      ENABLE_SMALL_MODEL: ${ENABLE_SMALL_MODEL:-false}
-      SMALL_MODEL_ID: ${SMALL_MODEL_ID:-phi3-mini}
-      SMALL_LLM_ENDPOINT: ${SMALL_LLM_ENDPOINT:-http://vllm-light:8002/v1}
-      RAG_TOP_K: ${RAG_TOP_K:-6}
-      SMALL_MODEL_TOP_K: ${SMALL_MODEL_TOP_K:-3}
-      RAG_MAX_CHUNK_CHARS: ${RAG_MAX_CHUNK_CHARS:-800}
-      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.0}
-      LLM_TIMEOUT: ${LLM_TIMEOUT:-150}
-      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
-      QDRANT_URL: http://qdrant:6333
-      ELASTIC_HOST: ${ELASTIC_HOST:-http://elasticsearch:9200}
-      ELASTIC_INDEX: ${ELASTIC_INDEX:-rag_documents}
-      HYBRID_FUSION: ${HYBRID_FUSION:-rrf}
-      HYBRID_WEIGHT_VECTOR: ${HYBRID_WEIGHT_VECTOR:-0.6}
-      HYBRID_WEIGHT_KEYWORD: ${HYBRID_WEIGHT_KEYWORD:-0.4}
-      HYBRID_BM25_TOP_K: ${HYBRID_BM25_TOP_K:-10}
-      KEYCLOAK_URL: http://keycloak:8080/
-      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-      BYPASS_AUTH: "true"
-      ENABLE_RERANKER: ${ENABLE_RERANKER:-true}
-      DEFAULT_USE_RAG: ${DEFAULT_USE_RAG:-true}
-      MARIADB_HOST: ${MARIADB_HOST:-mariadb}
-      MARIADB_PORT: ${MARIADB_PORT:-3306}
-      MARIADB_DB: ${MARIADB_DB:-rag}
-      MARIADB_USER: ${MARIADB_USER:-rag_user}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
-      DATA_ROOT: /data
-      PUBLIC_GATEWAY_URL: ${PUBLIC_GATEWAY_URL:-http://localhost:8081}
-      ENABLE_INSIGHTS: ${ENABLE_INSIGHTS:-true}
-      ENABLE_INVENTORY: ${ENABLE_INVENTORY:-true}
+        PUBLIC_GATEWAY_URL: http://localhost:8090
+        VLLM_ENDPOINT: ${VLLM_ENDPOINT:-http://vllm:8000/v1}
+        RAG_MODEL_ID: ${RAG_MODEL_ID:-mistral}
+        ENABLE_SMALL_MODEL: ${ENABLE_SMALL_MODEL:-false}
+        SMALL_MODEL_ID: ${SMALL_MODEL_ID:-phi3-mini}
+        SMALL_LLM_ENDPOINT: ${SMALL_LLM_ENDPOINT:-http://vllm-light:8002/v1}
+        RAG_TOP_K: ${RAG_TOP_K:-6}
+        SMALL_MODEL_TOP_K: ${SMALL_MODEL_TOP_K:-3}
+        RAG_MAX_CHUNK_CHARS: ${RAG_MAX_CHUNK_CHARS:-800}
+        LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.0}
+        LLM_TIMEOUT: ${LLM_TIMEOUT:-150}
+        LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+        QDRANT_URL: http://qdrant:6333
+        ELASTIC_HOST: ${ELASTIC_HOST:-http://elasticsearch:9200}
+        ELASTIC_INDEX: ${ELASTIC_INDEX:-rag_documents}
+        HYBRID_FUSION: ${HYBRID_FUSION:-rrf}
+        HYBRID_WEIGHT_VECTOR: ${HYBRID_WEIGHT_VECTOR:-0.6}
+        HYBRID_WEIGHT_KEYWORD: ${HYBRID_WEIGHT_KEYWORD:-0.4}
+        HYBRID_BM25_TOP_K: ${HYBRID_BM25_TOP_K:-10}
+        KEYCLOAK_URL: http://keycloak:8080/
+        HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+        BYPASS_AUTH: "true"
+        ENABLE_RERANKER: ${ENABLE_RERANKER:-true}
+        DEFAULT_USE_RAG: ${DEFAULT_USE_RAG:-true}
+        MARIADB_HOST: ${MARIADB_HOST:-mariadb}
+        MARIADB_PORT: ${MARIADB_PORT:-3306}
+        MARIADB_DB: ${MARIADB_DB:-rag}
+        MARIADB_USER: ${MARIADB_USER:-rag_user}
+        MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
+        DATA_ROOT: /data
+        ENABLE_INSIGHTS: ${ENABLE_INSIGHTS:-true}
+        ENABLE_INVENTORY: ${ENABLE_INVENTORY:-true}
     networks:
       - rag-net
     depends_on:
@@ -258,7 +258,7 @@ services:
       OAUTH_PROVIDER: none
       API_BASE_URL: http://gateway:8081/v1
       ENABLE_SIGNUP: "true"
-      CORS_ALLOW_ORIGIN: 'http://localhost:5700;http://127.0.0.1:5700;http://localhost:5120'
+      CORS_ALLOW_ORIGIN: 'http://localhost:8080;http://localhost:5120;http://localhost:5700;http://127.0.0.1:5700;http://localhost:5720'
 
     networks:
       - rag-net

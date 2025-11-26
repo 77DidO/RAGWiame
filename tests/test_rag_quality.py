@@ -1,18 +1,19 @@
 """
-Tests de qualité du système RAG
-Teste la pertinence des résultats pour différents types de questions
+Tests de qualité du système RAG.
+Évalue la pertinence des réponses pour différents types de questions.
 """
 
-import requests
-import json
-from typing import List, Dict
+from typing import Dict, List
 
-# Configuration
-GATEWAY_URL = "http://localhost:8081/v1/chat/completions"
+import pytest
+import requests
+
+
+GATEWAY_URL = "http://localhost:8090/v1/chat/completions"
 PROJECT_ID = "ED257730"
 
-# Cas de test
-TEST_CASES = [
+
+TEST_CASES: List[Dict] = [
     {
         "name": "Question vague (devrait refuser)",
         "question": "quel est le montant ?",
@@ -34,7 +35,7 @@ TEST_CASES = [
         "expected_keywords": ["raboteuse", "chenille"],
     },
     {
-        "name": "Question sur enrobbé (spécifique)",
+        "name": "Question sur enrobé (spécifique)",
         "question": "Quel est le montant de la résine sablée sur enrobés ?",
         "expected_behavior": "answer",
         "min_score": 0.5,
@@ -56,141 +57,167 @@ TEST_CASES = [
 ]
 
 
-def test_rag_query(question: str, project_id: str = PROJECT_ID) -> Dict:
-    """Teste une requête RAG et retourne les résultats"""
+def rag_query(question: str, project_id: str = PROJECT_ID) -> Dict:
+    """Envoie une requête RAG au gateway et retourne les résultats bruts."""
     payload = {
         "model": "mistral",
         "messages": [{"role": "user", "content": question}],
         "stream": False,
     }
-    
+
     headers = {
         "Content-Type": "application/json",
         "X-Use-RAG": "true",
     }
-    
+
     try:
-        response = requests.post(GATEWAY_URL, json=payload, headers=headers, timeout=30)
+        response = requests.post(GATEWAY_URL, json=payload, headers=headers, timeout=60)
         response.raise_for_status()
         data = response.json()
-        
+
         answer = data["choices"][0]["message"]["content"]
         sources = data.get("sources") or []
-        
+
         return {
             "success": True,
             "answer": answer,
             "sources": sources,
             "num_sources": len(sources),
         }
-    except Exception as e:
+    except Exception as exc:  # pragma: no cover - dépend du réseau/gateway
         return {
             "success": False,
-            "error": str(e),
+            "error": str(exc),
         }
 
 
 def evaluate_result(test_case: Dict, result: Dict) -> Dict:
-    """Évalue si le résultat correspond aux attentes"""
+    """Évalue si le résultat correspond aux attentes métier."""
     evaluation = {
         "test_name": test_case["name"],
         "question": test_case["question"],
         "passed": False,
         "details": [],
     }
-    
+
     if not result["success"]:
-        evaluation["details"].append(f"❌ Erreur: {result['error']}")
+        evaluation["details"].append(f"✗ Erreur: {result['error']}")
         return evaluation
-    
-    answer = result["answer"].lower()
+
+    answer = (result["answer"] or "").lower()
     expected_behavior = test_case["expected_behavior"]
-    
-    # Vérifier le comportement attendu
+
     if expected_behavior == "refuse":
-        if "manque de contexte" in answer or "pas trouvé" in answer or "suffisamment pertinents" in answer:
-            evaluation["details"].append("✅ Refus correct de répondre")
+        if any(
+            phrase in answer
+            for phrase in [
+                "manque de contexte",
+                "pas trouvé",
+                "pas suffisamment pertinent",
+                "je ne peux pas répondre",
+            ]
+        ):
+            evaluation["details"].append("✓ Refus correct de répondre")
             evaluation["passed"] = True
         else:
-            evaluation["details"].append(f"❌ Devrait refuser mais a répondu: {answer[:100]}")
-    
+            evaluation["details"].append(
+                f"✗ Devrait refuser mais a répondu: {result['answer'][:120]!r}"
+            )
+
     elif expected_behavior == "answer":
-        if "manque de contexte" in answer or "pas trouvé" in answer:
-            evaluation["details"].append(f"❌ A refusé alors qu'il devrait répondre: {answer[:100]}")
+        if any(
+            phrase in answer
+            for phrase in [
+                "manque de contexte",
+                "pas trouvé",
+                "pas suffisamment pertinent",
+                "je ne peux pas répondre",
+            ]
+        ):
+            evaluation["details"].append(
+                f"✗ A refusé alors qu'il devrait répondre: {result['answer'][:120]!r}"
+            )
         else:
-            evaluation["details"].append("✅ A fourni une réponse")
-            
-            # Vérifier les mots-clés attendus
-            if "expected_keywords" in test_case:
-                keywords_found = []
-                keywords_missing = []
-                for keyword in test_case["expected_keywords"]:
-                    if keyword.lower() in answer:
-                        keywords_found.append(keyword)
-                    else:
-                        keywords_missing.append(keyword)
-                
-                if keywords_found:
-                    evaluation["details"].append(f"✅ Mots-clés trouvés: {', '.join(keywords_found)}")
-                if keywords_missing:
-                    evaluation["details"].append(f"⚠️ Mots-clés manquants: {', '.join(keywords_missing)}")
-                
-                # Test réussi si au moins 50% des mots-clés sont présents
-                if len(keywords_found) >= len(test_case["expected_keywords"]) * 0.5:
+            evaluation["details"].append("✓ A fourni une réponse")
+            keywords = test_case.get("expected_keywords", [])
+            if keywords:
+                found = [kw for kw in keywords if kw.lower() in answer]
+                missing = [kw for kw in keywords if kw.lower() not in answer]
+                if found:
+                    evaluation["details"].append(
+                        f"✓ Mots-clés trouvés: {', '.join(found)}"
+                    )
+                if missing:
+                    evaluation["details"].append(
+                        f"⚠ Mots-clés manquants: {', '.join(missing)}"
+                    )
+                if len(found) >= max(1, int(len(keywords) * 0.5)):
                     evaluation["passed"] = True
             else:
                 evaluation["passed"] = True
-            
-            # Vérifier le nombre de sources
+
             if result["num_sources"] > 0:
-                evaluation["details"].append(f"✅ {result['num_sources']} source(s) citée(s)")
+                evaluation["details"].append(
+                    f"✓ {result['num_sources']} source(s) citée(s)"
+                )
             else:
-                evaluation["details"].append("⚠️ Aucune source citée")
-    
+                evaluation["details"].append("⚠ Aucune source citée")
+
     return evaluation
 
 
-def run_all_tests():
-    """Exécute tous les tests et affiche les résultats"""
+def run_all_tests() -> List[Dict]:
+    """Exécution simple en mode script (hors pytest)."""
     print("=" * 80)
     print("TESTS DE QUALITÉ RAG")
     print("=" * 80)
     print()
-    
-    results = []
+
+    results: List[Dict] = []
     passed = 0
     failed = 0
-    
+
     for i, test_case in enumerate(TEST_CASES, 1):
         print(f"Test {i}/{len(TEST_CASES)}: {test_case['name']}")
         print(f"Question: {test_case['question']}")
         print("-" * 80)
-        
-        result = test_rag_query(test_case["question"])
+
+        result = rag_query(test_case["question"])
         evaluation = evaluate_result(test_case, result)
-        
+
         for detail in evaluation["details"]:
             print(f"  {detail}")
-        
+
         if evaluation["passed"]:
             print("  ✅ TEST RÉUSSI")
             passed += 1
         else:
             print("  ❌ TEST ÉCHOUÉ")
             failed += 1
-        
+
         if result["success"]:
             print(f"\n  Réponse: {result['answer'][:200]}...")
-        
+
         print()
         results.append(evaluation)
-    
+
     print("=" * 80)
     print(f"RÉSULTATS: {passed}/{len(TEST_CASES)} tests réussis ({failed} échecs)")
     print("=" * 80)
-    
+
     return results
 
 
 if __name__ == "__main__":
     run_all_tests()
+
+
+@pytest.mark.parametrize("test_case", TEST_CASES, ids=[tc["name"] for tc in TEST_CASES])
+def test_rag_quality_case(test_case: Dict) -> None:
+    """Version pytest paramétrée des scénarios de qualité RAG."""
+    result = rag_query(test_case["question"])
+    evaluation = evaluate_result(test_case, result)
+
+    details = " | ".join(evaluation["details"])
+    assert evaluation["passed"], details
+

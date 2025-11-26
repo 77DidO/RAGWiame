@@ -25,6 +25,7 @@
 - [ ] **Relancer les tests de qualité RAG** après correction du connecteur
 - [ ] **Analyser les time-outs** sur certaines requêtes complexes
 - [ ] **Valider le hybrid-search** (RRF, top-k, reranker) sur cas réels
+- [ ] **Corriger `tests/test_rag_performance.py`** pour cibler `http://localhost:8090/v1/chat/completions` (ou lire l’URL depuis une variable d’environnement) et pouvoir générer un rapport de performance fiable
 
 ### 2. Pousser les commits vers le dépôt distant
 - [ ] **Push de la branche `main`** avec tous les commits récents
