@@ -26,7 +26,12 @@ class TextConnector(BaseConnector):
                 yield path
 
     def load(self, path: Path) -> Iterable[DocumentChunk]:
-        text = path.read_text(encoding="utf-8")
+        # Lecture robuste des fichiers texte : on essaie UTF‑8 puis un fallback latin‑1
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            # Fallback pour les fichiers encodés en ANSI/Windows‑1252 ou similaires
+            text = path.read_text(encoding="latin-1", errors="replace")
         position = 0
         index = 0
         while position < len(text):
