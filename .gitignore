@@ -13,6 +13,7 @@ data/uploads/
 openwebui_data/
 
 # Fichiers temporaires et de debug
+_tmp_*
 *.zip
 test_results*.txt
 debug_*.py
