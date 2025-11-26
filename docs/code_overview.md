@@ -53,16 +53,6 @@ Ce rapport synthétise la structure du code, les points d’entrée, les princip
 
 ## Pipeline LLM
 - `RagPipeline.query()`
-  - `index.as_retriever(similarity_top_k)` + filtres `MetadataFilters` (service/role)
-  - Rerank optionnel: `CrossEncoder("amberoad/bert-multilingual-passage-reranking-msmarco")`
-  - Prompt QA strict (fr) et tronquage des snippets à `RAG_MAX_CHUNK_CHARS`
-- `RagPipeline.chat_only()` → prompt bref sans retrieval
-
-## Classification, Insights, Inventaire (CLIs)
-- `ingestion/classify_cli.py` → regroupe par source, tronque, classe via endpoint OpenAI-like (vLLM), écrit dans `document_classification`.
-- `ingestion/insights_cli.py` → lit XLSX, détecte lignes TOTAL (valeur max sur la ligne), upsert `document_insights`.
-- `ingestion/inventory_cli.py` → scanne arborescence, remplit `document_inventory`.
-
 ## Services Docker (infra/docker-compose.yml)
 - `mariadb`, `keycloak`, `qdrant`, `vllm` (Mistral), `vllm-light` (Phi‑3 mini, profil `light`), `gateway`, `openwebui`.
 - Jobs: `ingestion`, `indexation`, `insights`, `inventory`, `classification`.

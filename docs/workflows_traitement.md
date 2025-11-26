@@ -12,9 +12,10 @@ Ce document présente les principaux workflows de traitement de la plateforme RA
 1. **Dépôt des fichiers**
    - Par upload UI (FastAPI) ou copie dans `data/examples/`.
 2. **Découverte et segmentation**
-   - Pipeline d’ingestion (`ingestion/pipeline.py`) :
+   - Pipeline d'ingestion (`ingestion/pipeline.py`) :
      - Connecteurs TXT, PDF, DOCX, Excel, MariaDB.
      - Nettoyage, découpe en chunks, détection de sections/FAQ, enrichissement des métadonnées (`doc_hint`, section, chunk_index).
+     - **Filtre de qualité** : exclusion automatique des chunks de faible qualité (>40% de chiffres, <20% de lettres, <50 caractères).
 3. **Indexation vectorielle**
    - Conversion des chunks en objets Document (LlamaIndex).
    - Embeddings HuggingFace.
@@ -26,7 +27,7 @@ Ce document présente les principaux workflows de traitement de la plateforme RA
   docker compose -f infra/docker-compose.yml run --rm ingestion
   docker compose -f infra/docker-compose.yml run --rm indexation
   ```
-- Ou via l’upload UI (case à cocher “Lancer ingestion + indexation”).
+- Ou via l'upload UI (case à cocher "Lancer ingestion + indexation").
 
 ---
 
@@ -50,7 +51,7 @@ Ce document présente les principaux workflows de traitement de la plateforme RA
 
 ---
 
-## 3. Extraction d’insights (totaux DQE)
+## 3. Extraction d'insights (totaux DQE)
 
 **Objectif :** Extraire les montants clés des DQE (XLSX) pour répondre aux questions métier.
 
@@ -73,7 +74,7 @@ Ce document présente les principaux workflows de traitement de la plateforme RA
 **Objectif :** Maintenir une vue structurée des documents par projet/dossier.
 
 **Étapes :**
-1. **Scan de l’arborescence**
+1. **Scan de l'arborescence**
 2. **Enregistrement des métadonnées (projet, dossier, type, chemin)**
    - Persistance dans MariaDB (table `document_inventory`).
 
@@ -98,8 +99,9 @@ Ce document présente les principaux workflows de traitement de la plateforme RA
    - Rerank optionnel (CrossEncoder).
 4. **Formatage du contexte**
    - En-têtes source/page/section, snippets ciblés.
+   - Déduplication par source (un extrait par document).
 5. **Génération via LLM (vLLM)**
-   - Prompt système strict (français).
+   - Prompt système strict (français) avec règles anti-hallucination.
    - Ajout des citations et liens vers les documents.
 
 **Déclenchement :**
@@ -124,9 +126,9 @@ Ce document présente les principaux workflows de traitement de la plateforme RA
 
 ---
 
-## 7. Mode “chat direct” (sans RAG)
+## 7. Mode "chat direct" (sans RAG)
 
-**Objectif :** Permettre à l’utilisateur de dialoguer avec le LLM sans retrieval documentaire.
+**Objectif :** Permettre à l'utilisateur de dialoguer avec le LLM sans retrieval documentaire.
 
 **Étapes :**
 1. **Flag `use_rag=false` dans la requête**
@@ -157,7 +159,7 @@ Ce document présente les principaux workflows de traitement de la plateforme RA
 
 ---
 
-Pour plus de détails, voir aussi :
+Pour plus de détails, voir aussi :
 - `docs/code_overview.md`
 - `docs/ingestion.md`
 - `docs/gateway.md`
