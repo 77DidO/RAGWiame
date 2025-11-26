@@ -1,39 +1,46 @@
-# Workflow: Mettre à jour OpenWebUI tout en préservant les personnalisations RAG
+# Workflow: Mettre à jour OpenWebUI (Méthode Git Rebase)
 ---
-description: Mettre à jour OpenWebUI tout en sauvegardant et réappliquant les personnalisations RAG
+description: Mettre à jour OpenWebUI en préservant les modifications via Git Rebase
 ---
-1. **Sauvegarde des fichiers personnalisés**
-   ```bash
-   mkdir -p .backup/open-webui
-   cp src/lib/components/chat/MessageInput.svelte .backup/open-webui/MessageInput.svelte
-   cp src/lib/components/chat/Messages/Citations.svelte .backup/open-webui/Citations.svelte
-   ```
-2. **Mise à jour du sous‑module**
-   ```bash
-   git fetch upstream
-   git checkout main
-   git reset --hard upstream/main
-   ```
-3. **Restauration des personnalisations**
-   ```bash
-   cp .backup/open-webui/MessageInput.svelte src/lib/components/chat/MessageInput.svelte
-   cp .backup/open-webui/Citations.svelte src/lib/components/chat/Messages/Citations.svelte
-   git add src/lib/components/chat/MessageInput.svelte src/lib/components/chat/Messages/Citations.svelte
-   git commit -m "Re‑appliquer les personnalisations RAG après mise à jour"
-   ```
-4. **Re‑basage de la branche `custom-dev`**
-   ```bash
-   git checkout custom-dev
-   git rebase main
-   ```
-5. **Reconstruction du conteneur** (si vous utilisez Docker)
-   ```bash
-   docker compose build && docker compose up -d
-   ```
-6. **Vérification**
-   - Lancez l’application (`npm run dev` ou via Docker) et assurez‑vous que le bouton **RAG** apparaît et que les citations fonctionnent.
-   - Vérifiez la persistance du flag `ragEnabled` dans le stockage local.
----
-# Notes
-- Ce workflow doit être exécuté chaque fois que vous souhaitez mettre à jour OpenWebUI.
-- Vous pouvez ajouter d’autres fichiers personnalisés à la section **Sauvegarde** si nécessaire.
+
+Cette méthode est plus propre et robuste que la copie manuelle de fichiers. Elle ré-applique vos commits personnalisés au-dessus de la dernière version officielle.
+
+1.  **Préparation**
+    Assurez-vous d'être dans le dossier `open-webui` et que votre dépôt est propre.
+    ```bash
+    cd open-webui
+    git status
+    ```
+
+2.  **Récupération des mises à jour officielles**
+    ```bash
+    git fetch upstream
+    ```
+
+3.  **Mise à jour de la branche locale (Rebase)**
+    On se place sur votre branche `custom-dev` et on la "rebase" sur `upstream/main`.
+    ```bash
+    git checkout custom-dev
+    git rebase upstream/main
+    ```
+
+    > [!IMPORTANT]
+    > **Gestion des conflits** : Si git signale des conflits, vous devrez les résoudre manuellement pour chaque fichier, puis faire `git add <fichier>` et `git rebase --continue`.
+
+4.  **Mise à jour du dépôt distant (Force Push)**
+    Comme l'historique a changé, un push forcé est nécessaire sur votre fork.
+    ```bash
+    git push --force-with-lease origin custom-dev
+    ```
+
+5.  **Reconstruction de l'application**
+    Revenez à la racine et relancez les conteneurs.
+    ```bash
+    cd ..
+    docker compose down
+    docker compose up -d --build
+    ```
+
+6.  **Vérification**
+    - Vérifiez que l'application démarre correctement.
+    - Vérifiez que vos fonctionnalités personnalisées (RAG, UI) sont toujours présentes.
