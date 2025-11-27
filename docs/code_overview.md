@@ -5,7 +5,7 @@ Ce rapport synthétise la structure du code, les points d’entrée, les princip
 ## Composants principaux
 - Gateway FastAPI: `llm_pipeline/api.py` — expose `/rag/query`, `/v1/chat/completions`, `/v1/models`, `/files/view`, `/healthz`.
 - Pipeline RAG: `llm_pipeline/pipeline.py` — retrieval LlamaIndex, rerank CrossEncoder (optionnel), génération via `OpenAILike` (vLLM).
-- Ingestion: `ingestion/pipeline.py` — découverte, nettoyage, segmentation, enrichissement (FAQ/sections/doc_hint).
+- Ingestion: `ingestion/pipeline.py` (orchestrateur) + modules spécialisés (`text_processor`, `structure_detector`, `metadata_enricher`, `quality_filter`) — découverte, nettoyage, segmentation, enrichissement.
 - Connecteurs: `ingestion/connectors/*` — `pdf`, `docx`, `excel`, `text`, `mariadb`.
 - Indexation Qdrant: `indexation/qdrant_indexer.py` — embeddings HF, collection `rag_documents`.
 - Upload UI: `upload_ui/main.py` — mini FastAPI d’upload, déclenche `indexation` via docker compose.
