@@ -164,3 +164,15 @@ Pour plus de détails, voir aussi :
 - `docs/ingestion.md`
 - `docs/gateway.md`
 - `docs/prompt_gateway.md`
+
+### Script de test rapide
+
+Un script de "smoke tests" permet d'exécuter ces workflows via CLI :
+
+```bash
+python scripts/test_workflows.py                # tous les workflows principaux
+python scripts/test_workflows.py --only rag_query chat_direct
+python scripts/test_workflows.py --skip ingestion indexation
+```
+
+Il enchaîne les jobs docker-compose (ingestion, indexation, classification, insights, inventory) puis valide les endpoints `/rag/query` et `/v1/chat/completions`. Ajustez `--compose-file` ou `--gateway-url` si besoin.

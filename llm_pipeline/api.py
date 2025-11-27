@@ -306,6 +306,18 @@ def _append_citations_text(answer: str, citations: List[Dict[str, Any]]) -> str:
     return f"{answer}\n\n{joined}"
 
 
+def _prettify_display_path(relative: str) -> str:
+    """Make citation labels cleaner (strip conversion suffixes like .txt.xlsx)."""
+    normalized = relative.replace("\\", "/")
+    name = Path(normalized).name
+    pretty = re.sub(r"\.txt\.(pdf|docx|xlsx|xls|csv)\b", r".\1", name, flags=re.IGNORECASE)
+    pretty = re.sub(r"\.(pdf|docx|xlsx|xls|csv)\.\1\b", r".\1", pretty, flags=re.IGNORECASE)
+    if normalized.endswith(name):
+        prefix = normalized[: -len(name)]
+        return f"{prefix}{pretty}"
+    return pretty
+
+
 def _format_reference_link(citation: Dict[str, Any]) -> str:
     source = str(citation.get("source", "source inconnue"))
     chunk = str(citation.get("chunk", "") or "").strip()
@@ -315,15 +327,14 @@ def _format_reference_link(citation: Dict[str, Any]) -> str:
     elif source.startswith(str(DATA_ROOT)):
         relative = str(Path(source).relative_to(DATA_ROOT))
     relative = relative.replace("\\", "/")
+    display_path = _prettify_display_path(relative)
     link = f"{PUBLIC_GATEWAY_URL}/files/view?path={quote(relative)}"
-    base_name = Path(relative).name or relative
-    display_path = relative
+    base_name = Path(display_path).name or display_path
     chunk_suffix = _format_chunk_suffix(base_name, chunk)
     if chunk_suffix:
-        display_path = f"{relative} · {chunk_suffix}"
+        display_path = f"{display_path} - {chunk_suffix}"
     safe_label = display_path.replace("`", "'")
     return f"[{safe_label}]({link})"
-
 
 def _format_citation_snippet(citation: Dict[str, Any]) -> str:
     snippet = str(citation.get("snippet", "") or "").strip()
@@ -573,3 +584,4 @@ async def chat_completions(
         choices=[choice],
         sources=sources if sources else None,
     )
+
