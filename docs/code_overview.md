@@ -1,76 +1,73 @@
-# Vue d’ensemble du code — RAGWiame
+# Vue d'ensemble du code — RAGWiame
 
-Ce rapport synthétise la structure du code, les points d’entrée, les principaux flux et les dépendances clés du projet.
+Ce rapport synthétise la structure du code, les points d'entrée, les principaux flux et les dépendances clés du projet.
 
-## Composants principaux
-- Gateway FastAPI: `llm_pipeline/api.py` — expose `/rag/query`, `/v1/chat/completions`, `/v1/models`, `/files/view`, `/healthz`.
-- Pipeline RAG: `llm_pipeline/pipeline.py` — retrieval LlamaIndex, rerank CrossEncoder (optionnel), génération via `OpenAILike` (vLLM).
-- Ingestion: `ingestion/pipeline.py` (orchestrateur) + modules spécialisés (`text_processor`, `structure_detector`, `metadata_enricher`, `quality_filter`) — découverte, nettoyage, segmentation, enrichissement.
-- Connecteurs: `ingestion/connectors/*` — `pdf`, `docx`, `excel`, `text`, `mariadb`.
-- Indexation Qdrant: `indexation/qdrant_indexer.py` — embeddings HF, collection `rag_documents`.
-- Upload UI: `upload_ui/main.py` — mini FastAPI d’upload, déclenche `indexation` via docker compose.
-- Insights & Inventaire: `ingestion/insights*.py`, `ingestion/inventory*.py` + services Gateway `llm_pipeline/insights.py`, `llm_pipeline/inventory.py`.
+## Architecture modulaire
 
-## Apps FastAPI et routes
-- `llm_pipeline/api.py`
-  - POST `/rag/query` → RAG + réponses directes (insights/inventaire) + citations.
-  - POST `/v1/chat/completions` → Compat OpenAI; passe par RAG ou mode chat selon `metadata.use_rag`.
-  - GET `/v1/models` → liste des modèles registrés (ex: `mistral`, `phi3-mini`).
-  - GET `/files/view?path=...` → sert les fichiers de `DATA_ROOT` (inline PDF/TXT/HTML sinon download).
-  - GET `/healthz` → liveness.
-- `upload_ui/main.py`
-  - GET `/` → formulaire HTML simple.
-  - POST `/` → upload dans `data/examples` + option de lancer `indexation`.
+Le projet suit une **architecture modulaire** avec séparation claire des responsabilités :
+
+### LLM Pipeline (`llm_pipeline/`)
+- **`api.py`** (260 lignes) : Gateway FastAPI, routes `/rag/query`, `/v1/chat/completions`, `/v1/models`, `/files/view`
+- **`pipeline.py`** (220 lignes) : Orchestrateur RAG principal
+- **`config.py`** : Configuration centralisée (modèles, RAG, hybrid search)
+- **`models.py`** : Modèles Pydantic (QueryPayload, ChatRequest, etc.)
+- **`prompts.py`** : Templates de prompts spécialisés (default, fiche, chiffres, chat)
+- **`context_formatting.py`** : Formatage du contexte RAG
+- **`retrieval.py`** : Recherche hybride (Vector + BM25)
+- **`reranker.py`** : CrossEncoder pour reranking
+- **`citation_formatter.py`** : Formatage des citations pour OpenWebUI
+- **`request_utils.py`** : Utilitaires requêtes (filtres, normalisation, RAG mode)
+- **`text_utils.py`** : Fonctions texte (tokenize, citation_key)
+- **`query_classification.py`** : Classification des questions
+- **`insights.py`**, **`inventory.py`** : Services spécialisés
+
+### Ingestion (`ingestion/`)
+- **`pipeline.py`** (160 lignes) : Orchestrateur d'ingestion
+- **`text_processor.py`** : Nettoyage et découpage texte
+- **`structure_detector.py`** : Détection sections et FAQ
+- **`metadata_enricher.py`** : Classification doc_hint
+- **`quality_filter.py`** : Filtre de qualité (rejette chunks < 50 chars, >40% chiffres, <20% lettres)
+- **`connectors/`** : PDF, DOCX, Excel, Text, MariaDB
+
+### Indexation (`indexation/`)
+- **`qdrant_indexer.py`** : Embeddings HF, collection Qdrant
+
+## Flux RAG
+
+1. **Requête** → `api.py` reçoit `/v1/chat/completions`
+2. **Classification** → `query_classification.py` détecte le type de question
+3. **Recherche** → `retrieval.py` effectue recherche hybride (Vector + BM25)
+4. **Reranking** → `reranker.py` réordonne avec CrossEncoder
+5. **Contexte** → `context_formatting.py` formate les chunks
+6. **Génération** → `pipeline.py` appelle vLLM avec le prompt adapté
+7. **Citations** → `citation_formatter.py` formate pour OpenWebUI
 
 ## Ingestion → Indexation
-- Pipeline: `IngestionPipeline.run()` parcourt chaque connecteur et segmente avec:
-  - Détection de sections (titres/"... :") et blocs FAQ (Question/Réponse)
-  - Buffering par paragraphe et découpe par `chunk_size/chunk_overlap`
-  - `doc_hint` inféré (courriel, planning, memoire, dqe, tableur, pdf)
-- Connecteurs:
-  - `PDFConnector` (pdfplumber): page → chunk + métadonnées (Author, Title, Page…)
-  - `DocxConnector` (python-docx): paragraphe
-  - `ExcelConnector` (pandas): feuille → CSV tronqué (options lignes/colonnes/formules)
-  - `TextConnector`: fenêtrage fixe avec chevauchement
-  - `MariaDBConnector` (optionnel): requête SQL → lignes formatées key: value
-- Indexation: `indexation/qdrant_indexer.py`
-  - Convertit les chunks → `llama_index.core.Document`
-  - `VectorStoreIndex.from_documents` avec `QdrantVectorStore` et `HuggingFaceEmbedding`
 
-## Chaîne RAG (Gateway)
-- Index partagé: `_build_index()` — Qdrant (URL/collection), embeddings HF, LlamaIndex.
-- Sélection modèle: `get_pipeline(model_id)` → endpoint `MODEL_ENDPOINTS` (mistral/vllm, phi3-mini/vllm-light) + `top_k`.
-- RAG vs Chat: `_resolve_rag_mode(question, explicit)`
-  - `DEFAULT_USE_RAG` ou directives inline: `#norag`, `rag:false`, `#forcerag`, `rag:true`.
-- Réponses directes (court-circuit RAG):
-  - `DocumentInventoryService.try_answer()` → table `document_inventory`
-  - `DocumentInsightService.try_answer()` → table `document_insights` (totaux DQE)
-- Contexte & citations: `_format_context()` assemble en-têtes [Source|Page|Section], snippets ciblés; `_append_citations_text()` ajoute un bloc Références avec liens `/files/view`.
-- Toggle RAG dans Open WebUI :
-  - `src/lib/components/chat/Chat.svelte` stocke `ragEnabled` (clé `chat-rag-mode`) et transmet `metadata: { use_rag: ragEnabled }` dans la requête `/v1/chat/completions`.
-  - `ChatControls.svelte`/`Controls.svelte` exposent un switch “Mode RAG” pour l’utilisateur.
-  - `_resolve_rag_mode()` côté gateway lit ce flag (en plus des directives `#norag`/`#forcerag`) pour choisir entre `RagPipeline.query()` et `chat_only()`.
+1. **Découverte** → Connecteurs scannent `data/`
+2. **Chunking** → `text_processor.py` découpe le texte
+3. **Structure** → `structure_detector.py` détecte FAQ/sections
+4. **Enrichissement** → `metadata_enricher.py` infère doc_hint
+5. **Filtrage** → `quality_filter.py` rejette chunks de faible qualité
+6. **Indexation** → `qdrant_indexer.py` crée embeddings et indexe
 
-## Pipeline LLM
-- `RagPipeline.query()`
-## Services Docker (infra/docker-compose.yml)
-- `mariadb`, `keycloak`, `qdrant`, `vllm` (Mistral), `vllm-light` (Phi‑3 mini, profil `light`), `gateway`, `openwebui`.
-- Jobs: `ingestion`, `indexation`, `insights`, `inventory`, `classification`.
-- Volumes: données persistées pour MariaDB, Qdrant, modèles vLLM, et `openwebui_data`.
+## Tests
 
-## Paramètres clés (Gateway)
-- Modèles: `RAG_MODEL_ID`, `VLLM_ENDPOINT`, `ENABLE_SMALL_MODEL`, `SMALL_MODEL_ID`, `SMALL_LLM_ENDPOINT`.
-- RAG: `RAG_TOP_K`, `SMALL_MODEL_TOP_K`, `RAG_MAX_CHUNK_CHARS`, `ENABLE_RERANKER`.
-- LLM: `LLM_TEMPERATURE`, `LLM_TIMEOUT`, `LLM_MAX_RETRIES`.
-- Données: `QDRANT_URL`, `DATA_ROOT`, `PUBLIC_GATEWAY_URL`.
-- Auth & bases: `KEYCLOAK_URL`, `MARIADB_*`, `ENABLE_INSIGHTS`, `ENABLE_INVENTORY`, `BYPASS_AUTH`.
+- **25+ tests unitaires** couvrant tous les modules
+- Tests d'intégration pour ingestion et pipeline
+- Tous les tests passent ✅
 
-## Points d’extension / Qualité
-- Ajouts possibles: 
-  - Connecteurs (ex: SharePoint, S3) via `BaseConnector`.
-  - Rerankers alternatifs/MLC; réglage `initial_top_k`.
-  - Normalisation `document_label` post-classification côté UI ou batch.
-- Tests: CLIs Typer testables; endpoints FastAPI couverts via TestClient (à compléter si besoin).
+## Services Docker
+
+- `mariadb`, `keycloak`, `qdrant`, `vllm`, `gateway`, `openwebui`
+- Jobs: `ingestion`, `indexation`, `insights`, `inventory`
+
+## Configuration (via `llm_pipeline/config.py`)
+
+- Modèles: `RAG_MODEL_ID`, `SMALL_MODEL_ID`
+- RAG: `RAG_TOP_K`, `RAG_MAX_CHUNK_CHARS`, `ENABLE_RERANKER`
+- Hybrid: `HYBRID_FUSION`, `HYBRID_WEIGHT_VECTOR`, `HYBRID_BM25_TOP_K`
+- LLM: `LLM_TEMPERATURE`, `LLM_TIMEOUT`
 
 ---
-Généré automatiquement par analyse du dépôt. Ouvrir: `docs/code_overview.md`.
+Mis à jour après refactoring complet (Phases 1-6).
