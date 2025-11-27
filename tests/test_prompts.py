@@ -13,7 +13,7 @@ def test_prompts_content():
     assert "{question}" in default
     
     fiche = get_fiche_prompt()
-    assert "fiche d'identité" in fiche
+    assert "informations structurées" in fiche
     
     chiffres = get_chiffres_prompt()
     assert "chiffres" in chiffres

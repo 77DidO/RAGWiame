@@ -1,4 +1,5 @@
 import os
+import math
 from typing import List, Tuple, Dict, Any
 from llama_index.core.vector_stores.types import MetadataFilters
 from llama_index.core import QueryBundle
@@ -14,6 +15,41 @@ HYBRID_FUSION = os.getenv("HYBRID_FUSION", "rrf").strip().lower()
 HYBRID_WEIGHT_VECTOR = float(os.getenv("HYBRID_WEIGHT_VECTOR", "0.6"))
 HYBRID_WEIGHT_KEYWORD = float(os.getenv("HYBRID_WEIGHT_KEYWORD", "0.4"))
 HYBRID_BM25_TOP_K = int(os.getenv("HYBRID_BM25_TOP_K", "30"))
+
+
+def node_id(node) -> str:
+    """Extract unique identifier from a node object."""
+    if hasattr(node, "node") and node.node is not None and hasattr(node.node, "id_"):
+        return str(node.node.id_)
+    if hasattr(node, "id_"):
+        return str(node.id_)
+    if hasattr(node, "node_id"):
+        return str(node.node_id)
+    return str(getattr(node, "id", ""))
+
+
+def metadata_filters_to_dict(filters: MetadataFilters | None) -> Dict[str, str]:
+    """Convert MetadataFilters to a simple dict."""
+    if not filters or not getattr(filters, "filters", None):
+        return {}
+    result: Dict[str, str] = {}
+    for f in filters.filters:
+        key = getattr(f, "key", None)
+        value = getattr(f, "value", None)
+        if key and value:
+            result[str(key)] = str(value)
+    return result
+
+
+def normalize_score_map(scores: Dict[str, float]) -> Dict[str, float]:
+    """Normalize scores to [0, 1] range."""
+    if not scores:
+        return {}
+    values = list(scores.values())
+    min_val, max_val = min(values), max(values)
+    if math.isclose(max_val, min_val):
+        return {k: 1.0 for k in scores.keys()}
+    return {k: (v - min_val) / (max_val - min_val) for k, v in scores.items()}
 
 
 def hybrid_query(pipeline, question: str, filters: MetadataFilters | None = None) -> Tuple[List, List[Dict[str, Any]]]:
@@ -33,11 +69,7 @@ def hybrid_query(pipeline, question: str, filters: MetadataFilters | None = None
     # BM25 retrieval
     bm25_hits = []
     if bm25_search:
-        # We need to convert filters to dict. 
-        # If pipeline has the helper, use it; otherwise empty dict.
-        filter_dict = {}
-        if hasattr(pipeline, "_metadata_filters_to_dict"):
-            filter_dict = pipeline._metadata_filters_to_dict(filters)
+        filter_dict = metadata_filters_to_dict(filters)
             
         try:
             bm25_hits = bm25_search(
@@ -57,36 +89,18 @@ def hybrid_query(pipeline, question: str, filters: MetadataFilters | None = None
     combined_scores: Dict[str, float] = {}
     node_store: Dict[str, object] = {}
 
-    # Helper to get node ID
-    def get_id(node):
-        if hasattr(node, "node") and node.node is not None and hasattr(node.node, "id_"):
-            return str(node.node.id_)
-        if hasattr(node, "id_"):
-            return str(node.id_)
-        return str(getattr(node, "id", ""))
+    # Helper to get node ID is now the top-level node_id() function
 
     if HYBRID_FUSION == "weighted":
-        vec_scores = {get_id(node): float(getattr(node, "score", 0.0) or 0.0) for node in vector_nodes}
-        kw_scores = {get_id(node): float(getattr(node, "score", 0.0) or 0.0) for node in bm25_nodes}
+        vec_scores = {node_id(node): float(getattr(node, "score", 0.0) or 0.0) for node in vector_nodes}
+        kw_scores = {node_id(node): float(getattr(node, "score", 0.0) or 0.0) for node in bm25_nodes}
 
-        # We need a normalization helper. If pipeline has it, use it, else simple local one?
-        # For simplicity, let's assume we can access pipeline._normalize_score_map if it exists,
-        # or implement a simple one here.
-        def normalize(scores):
-            if hasattr(pipeline, "_normalize_score_map"):
-                return pipeline._normalize_score_map(scores)
-            if not scores: return {}
-            vals = list(scores.values())
-            min_v, max_v = min(vals), max(vals)
-            if max_v == min_v: return {k: 1.0 for k in scores}
-            return {k: (v - min_v) / (max_v - min_v) for k, v in scores.items()}
-
-        vec_norm = normalize(vec_scores)
-        kw_norm = normalize(kw_scores)
+        vec_norm = normalize_score_map(vec_scores)
+        kw_norm = normalize_score_map(kw_scores)
 
         all_ids = set(vec_norm.keys()) | set(kw_norm.keys())
-        for node in vector_nodes: node_store[get_id(node)] = node
-        for node in bm25_nodes: node_store.setdefault(get_id(node), node)
+        for node in vector_nodes: node_store[node_id(node)] = node
+        for node in bm25_nodes: node_store.setdefault(node_id(node), node)
 
         for doc_id in all_ids:
             v = vec_norm.get(doc_id, 0.0)
@@ -95,11 +109,11 @@ def hybrid_query(pipeline, question: str, filters: MetadataFilters | None = None
     else:
         # RRF
         for rank, node in enumerate(vector_nodes):
-            doc_id = get_id(node)
+            doc_id = node_id(node)
             node_store[doc_id] = node
             combined_scores[doc_id] = combined_scores.get(doc_id, 0.0) + 1.0 / (rank + 1)
         for rank, node in enumerate(bm25_nodes):
-            doc_id = get_id(node)
+            doc_id = node_id(node)
             node_store.setdefault(doc_id, node)
             combined_scores[doc_id] = combined_scores.get(doc_id, 0.0) + 1.0 / (rank + 1)
 

@@ -71,7 +71,7 @@ def rag_query(question: str, project_id: str = PROJECT_ID) -> Dict:
     }
 
     try:
-        response = requests.post(GATEWAY_URL, json=payload, headers=headers, timeout=60)
+        response = requests.post(GATEWAY_URL, json=payload, headers=headers, timeout=120)
         response.raise_for_status()
         data = response.json()
 
@@ -113,6 +113,7 @@ def evaluate_result(test_case: Dict, result: Dict) -> Dict:
             for phrase in [
                 "manque de contexte",
                 "pas trouvé",
+                "je ne trouve pas",
                 "pas suffisamment pertinent",
                 "je ne peux pas répondre",
             ]

@@ -1,6 +1,7 @@
 from typing import List, Tuple, Dict, Set
 import re
 import json
+from llm_pipeline.text_utils import tokenize, citation_key
 
 def _select_relevant_text(text: str, keywords: List[str], max_chunk_chars: int = 800) -> str:
     """Select relevant sentences containing keywords, or return truncated text."""
@@ -67,7 +68,7 @@ def format_context(
     """Format context from nodes, deduplicating by source and removing XML tags."""
     
     # Extract keywords for relevance filtering
-    keywords = [kw for kw in re.findall(r"[a-z0-9]+", question.lower()) if len(kw) > 2]
+    keywords = [kw for kw in tokenize(question) if len(kw) > 2]
     
     chunks: List[str] = []
     snippet_map: Dict[str, str] = {}
@@ -110,7 +111,7 @@ def format_context(
         # Store in snippet map for citations
         # Key format: source::chunk_index (or id)
         chunk_id = metadata.get("chunk_index", getattr(node, "id_", ""))
-        key = f"{source}::{chunk_id}"
+        key = citation_key(source, chunk_id)
         snippet_map[key] = snippet
         
         # Add to context (Clean text, no <source> tags)
