@@ -49,3 +49,9 @@ KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://keycloak:8080/")
 
 # Qdrant
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+
+# Hybrid Search
+HYBRID_FUSION = os.getenv("HYBRID_FUSION", "rrf").strip().lower()
+HYBRID_WEIGHT_VECTOR = float(os.getenv("HYBRID_WEIGHT_VECTOR", "0.6"))
+HYBRID_WEIGHT_KEYWORD = float(os.getenv("HYBRID_WEIGHT_KEYWORD", "0.4"))
+HYBRID_BM25_TOP_K = int(os.getenv("HYBRID_BM25_TOP_K", "30"))

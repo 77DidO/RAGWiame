@@ -21,14 +21,10 @@ from llm_pipeline.prompts import (
     get_fiche_prompt,
     get_chiffres_prompt,
 )
-from llm_pipeline.context_formatting import format_context, _extract_node_text
+from llm_pipeline.context_formatting import format_context
 from llm_pipeline.retrieval import hybrid_query as pipeline_hybrid_query, node_id
 from llm_pipeline.text_utils import tokenize, citation_key
-
-HYBRID_FUSION = os.getenv("HYBRID_FUSION", "rrf").strip().lower()
-HYBRID_WEIGHT_VECTOR = float(os.getenv("HYBRID_WEIGHT_VECTOR", "0.6"))
-HYBRID_WEIGHT_KEYWORD = float(os.getenv("HYBRID_WEIGHT_KEYWORD", "0.4"))
-HYBRID_BM25_TOP_K = int(os.getenv("HYBRID_BM25_TOP_K", "30"))
+from llm_pipeline.reranker import CrossEncoderReranker
 
 
 @dataclass(slots=True)
@@ -70,14 +66,7 @@ class RagPipeline:
             timeout=timeout_seconds,
             max_retries=max_retries,
         )
-        self.cross_encoder = None
-        self.cross_encoder_batch_size = 8
-        if enable_reranker:
-            self.cross_encoder = CrossEncoder(
-                "amberoad/bert-multilingual-passage-reranking-msmarco",
-                default_activation_function=None,
-                max_length=512,
-            )
+        self.reranker = CrossEncoderReranker() if enable_reranker else None
 
         # Prompts pour les différents types de questions
         self.qa_prompt = PromptTemplate(get_default_prompt())
@@ -92,47 +81,9 @@ class RagPipeline:
 
 
     def _cross_encoder_rerank(self, nodes: List, question: str) -> List:
-        if not nodes:
-            return nodes
-        if self.cross_encoder is None:
+        if self.reranker is None:
             return nodes[: self.top_k]
-        query_text = question.strip()
-        if not query_text:
-            return nodes[: self.top_k]
-        pairs = []
-        filtered_nodes = []
-        for node in nodes:
-            text = _extract_node_text(node)
-            if not text:
-                continue
-            filtered_nodes.append(node)
-            pairs.append([query_text, text])
-        if not pairs:
-            return nodes[: self.top_k]
-        scores = self.cross_encoder.predict(
-            pairs,
-            batch_size=self.cross_encoder_batch_size,
-            show_progress_bar=False,
-        )
-        if hasattr(scores, "tolist"):
-            scores_seq = scores.tolist()
-        else:
-            scores_seq = list(scores)
-        normalized_scores: List[float] = []
-        for value in scores_seq:
-            if isinstance(value, (list, tuple)):
-                if not value:
-                    normalized_scores.append(0.0)
-                else:
-                    normalized_scores.append(float(value[0]))
-            else:
-                normalized_scores.append(float(value))
-        ranked = sorted(
-            zip(normalized_scores, filtered_nodes),
-            key=lambda item: item[0],
-            reverse=True,
-        )
-        return [node for _, node in ranked[: self.top_k]]
+        return self.reranker.rerank(nodes, question, self.top_k)
 
     def query(
         self,
