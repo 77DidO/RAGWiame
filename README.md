@@ -20,6 +20,27 @@ Plateforme RAG open source orientée francophonie. Ce dépôt fournit un kit com
 
 ## Démarrage rapide
 
+### Option 1 : Scripts PowerShell (Recommandé pour Windows)
+
+**Environnement de développement** (Docker + vLLM Mistral + vLLM Light + Frontend dev) :
+```powershell
+.\scripts\start-dev.ps1
+```
+
+**Environnement de production** (Docker + vLLM Mistral uniquement) :
+```powershell
+.\scripts\start-prod.ps1
+```
+
+**Arrêter tous les services** :
+```powershell
+.\scripts\stop-all.ps1
+```
+
+Consultez [scripts/README.md](scripts/README.md) pour la documentation complète, les URLs d'accès et le troubleshooting.
+
+### Option 2 : Script Python (Multi-plateforme)
+
 ```powershell
 # Depuis la racine du dépôt
 python scripts/start.py
@@ -27,8 +48,8 @@ python scripts/start.py
 
 Options utiles :
 
-- `--skip-bootstrap` : saute la création de l’environnement virtuel.
-- `--skip-deploy` : n’exécute pas `docker compose`.
+- `--skip-bootstrap` : saute la création de l'environnement virtuel.
+- `--skip-deploy` : n'exécute pas `docker compose`.
 - `--skip-build` : réutilise les images déjà construites.
 
 Le script vérifie que Docker Desktop tourne, installe les dépendances Python puis lance `docker compose -f infra/docker-compose.yml up -d`. Consultez `docs/demarrage_automatique.md` pour le détail pas à pas ou `docs/deploiement.md` pour la configuration avancée (profils GPU, variables d’environnement, etc.).
