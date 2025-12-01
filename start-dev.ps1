@@ -40,7 +40,8 @@ try {
         throw "Docker n'est pas accessible"
     }
     Write-Success "Docker Desktop est opérationnel"
-} catch {
+}
+catch {
     Write-Error-Custom "Docker Desktop n'est pas démarré ou n'est pas installé"
     Write-Warning-Custom "Veuillez démarrer Docker Desktop et réessayer"
     exit 1
@@ -64,7 +65,7 @@ try {
     Write-Host "   - OpenWebUI : port 8080" -ForegroundColor Gray
     Write-Host "`n   ⚠️  vLLM Light (Phi-3) n'est PAS démarré" -ForegroundColor Yellow
     
-    docker compose up -d
+    docker compose --profile mistral up -d
     
     if ($LASTEXITCODE -ne 0) {
         throw "Échec du démarrage des services Docker"
@@ -80,7 +81,8 @@ try {
     Write-Info "État des services Docker:"
     docker compose ps
     
-} catch {
+}
+catch {
     Write-Error-Custom "Erreur lors du démarrage des services Docker: $_"
     Pop-Location
     exit 1
@@ -95,7 +97,8 @@ $frontendPath = Join-Path $PSScriptRoot "open-webui"
 if (-not (Test-Path $frontendPath)) {
     Write-Warning-Custom "Le répertoire open-webui n'existe pas: $frontendPath"
     Write-Warning-Custom "Le frontend dev ne sera pas démarré"
-} else {
+}
+else {
     Push-Location $frontendPath
     
     try {
@@ -121,11 +124,13 @@ if (-not (Test-Path $frontendPath)) {
         # Démarrer le serveur de dev (bloquant)
         npm run dev
         
-    } catch {
+    }
+    catch {
         Write-Error-Custom "Erreur lors du démarrage du frontend: $_"
         Pop-Location
         exit 1
-    } finally {
+    }
+    finally {
         Pop-Location
     }
 }

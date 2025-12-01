@@ -39,7 +39,7 @@ Write-Host "`n🛑 Arrêt de l'environnement RAGWiame" -ForegroundColor Magenta
 Write-Host "=" * 70 -ForegroundColor Magenta
 
 # Se positionner dans le répertoire infra
-$infraPath = Join-Path $PSScriptRoot "..\infra"
+$infraPath = Join-Path $PSScriptRoot "infra"
 if (-not (Test-Path $infraPath)) {
     Write-Error-Custom "Le répertoire infra n'existe pas: $infraPath"
     exit 1
@@ -50,7 +50,13 @@ Push-Location $infraPath
 try {
     # Arrêter les services avec profil light
     Write-Info "Arrêt des services Docker (incluant profil 'light')..."
-    docker compose --profile light down $(if ($RemoveVolumes) { "-v" } else { "" })
+    
+    if ($RemoveVolumes) {
+        docker compose --profile light --profile mistral --profile tools down -v
+    }
+    else {
+        docker compose --profile light --profile mistral --profile tools down
+    }
     
     if ($LASTEXITCODE -ne 0) {
         throw "Échec de l'arrêt des services Docker"
@@ -60,7 +66,8 @@ try {
     
     if ($RemoveVolumes) {
         Write-Warning-Custom "Les volumes Docker ont été supprimés (données perdues)"
-    } else {
+    }
+    else {
         Write-Info "Les volumes Docker ont été conservés (données persistantes)"
     }
     
@@ -73,7 +80,8 @@ try {
     Write-Host "   - Prod: .\start-prod.ps1" -ForegroundColor Gray
     Write-Host ""
     
-} catch {
+}
+catch {
     Write-Error-Custom "Erreur lors de l'arrêt des services: $_"
     Pop-Location
     exit 1

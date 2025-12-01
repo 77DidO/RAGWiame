@@ -40,14 +40,15 @@ try {
         throw "Docker n'est pas accessible"
     }
     Write-Success "Docker Desktop est opérationnel"
-} catch {
+}
+catch {
     Write-Error-Custom "Docker Desktop n'est pas démarré ou n'est pas installé"
     Write-Warning-Custom "Veuillez démarrer Docker Desktop et réessayer"
     exit 1
 }
 
 # Se positionner dans le répertoire infra
-$infraPath = Join-Path $PSScriptRoot "..\infra"
+$infraPath = Join-Path $PSScriptRoot "infra"
 if (-not (Test-Path $infraPath)) {
     Write-Error-Custom "Le répertoire infra n'existe pas: $infraPath"
     exit 1
@@ -64,7 +65,7 @@ try {
     Write-Host "   - OpenWebUI : port 8080" -ForegroundColor Gray
     Write-Host "`n   ⚠️  vLLM Light (Phi-3) n'est PAS démarré en production" -ForegroundColor Yellow
     
-    docker compose up -d
+    docker compose --profile mistral up -d
     
     if ($LASTEXITCODE -ne 0) {
         throw "Échec du démarrage des services Docker"
@@ -97,7 +98,8 @@ try {
     
     Write-Host "`n✨ L'environnement est prêt à l'emploi!`n" -ForegroundColor Green
     
-} catch {
+}
+catch {
     Write-Error-Custom "Erreur lors du démarrage des services Docker: $_"
     Pop-Location
     exit 1

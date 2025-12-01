@@ -8,7 +8,7 @@ Ce document décrit les scripts PowerShell disponibles à la racine du projet po
 
 Démarre l'environnement de développement avec :
 - ✅ Tous les services Docker de base
-- ✅ vLLM Mistral 7B (modèle principal)
+- ✅ vLLM Mistral 7B (modèle principal, profil 'mistral')
 - ❌ vLLM Phi-3 mini (ARRÊTÉ)
 - ✅ Serveur de développement frontend (Vite sur port 5120)
 

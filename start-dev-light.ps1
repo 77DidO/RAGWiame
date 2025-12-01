@@ -79,11 +79,9 @@ try {
         throw "Échec du démarrage des services Docker"
     }
     
-    # Arrêter explicitement le gros modèle vLLM Mistral
-    Write-Info "Arrêt de vLLM Mistral pour économiser la VRAM..."
-    docker compose stop vllm
+    # vLLM Mistral ne démarre plus par défaut (profil 'mistral' requis)
     
-    Write-Success "Services Docker démarrés (Mistral arrêté, Gateway configurée sur Phi-3)"
+    Write-Success "Services Docker démarrés (Gateway configurée sur Phi-3)"
     
     # Attendre quelques secondes pour que les services démarrent
     Write-Info "Attente du démarrage des services (10 secondes)..."
