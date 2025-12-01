@@ -47,7 +47,7 @@ try {
 }
 
 # Se positionner dans le répertoire infra
-$infraPath = Join-Path $PSScriptRoot "..\infra"
+$infraPath = Join-Path $PSScriptRoot "infra"
 if (-not (Test-Path $infraPath)) {
     Write-Error-Custom "Le répertoire infra n'existe pas: $infraPath"
     exit 1
@@ -56,15 +56,15 @@ if (-not (Test-Path $infraPath)) {
 Push-Location $infraPath
 
 try {
-    # Démarrer les services Docker avec le profil light
-    Write-Info "Démarrage des services Docker (avec vllm-light)..."
+    # Démarrer les services Docker SANS le profil light
+    Write-Info "Démarrage des services Docker (avec vLLM Mistral uniquement)..."
     Write-Host "   - Services de base : MariaDB, Keycloak, Qdrant, Elasticsearch" -ForegroundColor Gray
     Write-Host "   - LLM principal : vLLM Mistral 7B (port 8100)" -ForegroundColor Gray
-    Write-Host "   - LLM léger : vLLM Phi-3 mini (port 8110)" -ForegroundColor Gray
     Write-Host "   - Gateway RAG : port 8090" -ForegroundColor Gray
     Write-Host "   - OpenWebUI : port 8080" -ForegroundColor Gray
+    Write-Host "`n   ⚠️  vLLM Light (Phi-3) n'est PAS démarré" -ForegroundColor Yellow
     
-    docker compose --profile light up -d
+    docker compose up -d
     
     if ($LASTEXITCODE -ne 0) {
         throw "Échec du démarrage des services Docker"
@@ -78,7 +78,7 @@ try {
     
     # Afficher l'état des services
     Write-Info "État des services Docker:"
-    docker compose --profile light ps
+    docker compose ps
     
 } catch {
     Write-Error-Custom "Erreur lors du démarrage des services Docker: $_"
@@ -90,7 +90,7 @@ Pop-Location
 
 # Démarrer le serveur de développement frontend
 Write-Info "`nDémarrage du serveur de développement frontend..."
-$frontendPath = Join-Path $PSScriptRoot "..\open-webui"
+$frontendPath = Join-Path $PSScriptRoot "open-webui"
 
 if (-not (Test-Path $frontendPath)) {
     Write-Warning-Custom "Le répertoire open-webui n'existe pas: $frontendPath"
@@ -114,7 +114,6 @@ if (-not (Test-Path $frontendPath)) {
         Write-Host "   - OpenWebUI:     http://localhost:8080" -ForegroundColor Yellow
         Write-Host "   - Gateway RAG:   http://localhost:8090" -ForegroundColor Yellow
         Write-Host "   - vLLM Mistral:  http://localhost:8100" -ForegroundColor Yellow
-        Write-Host "   - vLLM Light:    http://localhost:8110" -ForegroundColor Yellow
         Write-Host "   - Qdrant:        http://localhost:8130" -ForegroundColor Yellow
         Write-Host "`n⚡ Démarrage du serveur Vite..." -ForegroundColor Cyan
         Write-Host "   (Appuyez sur Ctrl+C pour arrêter)`n" -ForegroundColor Gray

@@ -1,22 +1,33 @@
 # Scripts PowerShell de Démarrage RAGWiame
 
-Ce répertoire contient des scripts PowerShell pour faciliter le démarrage et l'arrêt des environnements de développement et production.
+Ce document décrit les scripts PowerShell disponibles à la racine du projet pour faciliter le démarrage et l'arrêt des environnements de développement et production.
 
 ## 📜 Scripts Disponibles
 
-### `start-dev.ps1` - Environnement de Développement
+### `start-dev.ps1` - Environnement de Développement (Standard)
 
-Démarre l'environnement de développement complet avec :
-- ✅ Tous les services Docker de base (MariaDB, Keycloak, Qdrant, Elasticsearch)
+Démarre l'environnement de développement avec :
+- ✅ Tous les services Docker de base
 - ✅ vLLM Mistral 7B (modèle principal)
-- ✅ vLLM Phi-3 mini (modèle léger pour tests rapides)
-- ✅ Gateway RAG
-- ✅ OpenWebUI (production)
+- ❌ vLLM Phi-3 mini (ARRÊTÉ)
 - ✅ Serveur de développement frontend (Vite sur port 5120)
 
 **Utilisation :**
 ```powershell
-.\scripts\start-dev.ps1
+.\start-dev.ps1
+```
+
+### `start-dev-light.ps1` - Environnement de Développement (Light)
+
+Démarre l'environnement de développement léger (économie VRAM) avec :
+- ✅ Tous les services Docker de base
+- ❌ vLLM Mistral 7B (ARRÊTÉ)
+- ✅ vLLM Phi-3 mini (modèle léger)
+- ✅ Serveur de développement frontend (Vite sur port 5120)
+
+**Utilisation :**
+```powershell
+.\start-dev-light.ps1
 ```
 
 **URLs d'accès :**
@@ -39,7 +50,7 @@ Démarre l'environnement de production avec :
 
 **Utilisation :**
 ```powershell
-.\scripts\start-prod.ps1
+.\start-prod.ps1
 ```
 
 **URLs d'accès :**
@@ -57,10 +68,10 @@ Arrête tous les services Docker (y compris le profil 'light').
 **Utilisation :**
 ```powershell
 # Arrêter les services (conserver les données)
-.\scripts\stop-all.ps1
+.\stop-all.ps1
 
 # Arrêter les services ET supprimer les volumes (⚠️ perte de données)
-.\scripts\stop-all.ps1 -RemoveVolumes
+.\stop-all.ps1 -RemoveVolumes
 ```
 
 ---

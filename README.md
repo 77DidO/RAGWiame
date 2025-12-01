@@ -22,22 +22,27 @@ Plateforme RAG open source orientée francophonie. Ce dépôt fournit un kit com
 
 ### Option 1 : Scripts PowerShell (Recommandé pour Windows)
 
-**Environnement de développement** (Docker + vLLM Mistral + vLLM Light + Frontend dev) :
+**Environnement de développement** (Docker + vLLM Mistral + Frontend dev) :
 ```powershell
-.\scripts\start-dev.ps1
+.\start-dev.ps1
+```
+
+**Environnement de développement LIGHT** (Docker + vLLM Phi-3 + Frontend dev) :
+```powershell
+.\start-dev-light.ps1
 ```
 
 **Environnement de production** (Docker + vLLM Mistral uniquement) :
 ```powershell
-.\scripts\start-prod.ps1
+.\start-prod.ps1
 ```
 
 **Arrêter tous les services** :
 ```powershell
-.\scripts\stop-all.ps1
+.\stop-all.ps1
 ```
 
-Consultez [scripts/README.md](scripts/README.md) pour la documentation complète, les URLs d'accès et le troubleshooting.
+Consultez [SCRIPTS.md](SCRIPTS.md) pour la documentation complète, les URLs d'accès et le troubleshooting.
 
 ### Option 2 : Script Python (Multi-plateforme)
 
