@@ -48,7 +48,8 @@ try {
         throw "Docker n'est pas accessible"
     }
     Write-Success "Docker Desktop est opérationnel"
-} catch {
+}
+catch {
     Write-Error-Custom "Docker Desktop n'est pas démarré ou n'est pas installé"
     Write-Warning-Custom "Veuillez démarrer Docker Desktop et réessayer"
     exit 1
@@ -64,6 +65,12 @@ if (-not (Test-Path $infraPath)) {
 Push-Location $infraPath
 
 try {
+    # Configurer la Gateway pour utiliser le modèle léger comme modèle principal
+    Write-Info "Configuration de la Gateway pour Phi-3..."
+    $env:RAG_MODEL_ID = "phi3-mini"
+    $env:VLLM_ENDPOINT = "http://vllm-light:8002/v1"
+    $env:ENABLE_SMALL_MODEL = "false" # Pas besoin de le déclarer en double
+
     # Démarrer les services Docker avec le profil light
     Write-Info "Démarrage des services Docker (avec vllm-light)..."
     docker compose --profile light up -d
@@ -76,7 +83,7 @@ try {
     Write-Info "Arrêt de vLLM Mistral pour économiser la VRAM..."
     docker compose stop vllm
     
-    Write-Success "Services Docker démarrés (Mistral arrêté, Phi-3 actif)"
+    Write-Success "Services Docker démarrés (Mistral arrêté, Gateway configurée sur Phi-3)"
     
     # Attendre quelques secondes pour que les services démarrent
     Write-Info "Attente du démarrage des services (10 secondes)..."
@@ -86,7 +93,8 @@ try {
     Write-Info "État des services Docker:"
     docker compose --profile light ps
     
-} catch {
+}
+catch {
     Write-Error-Custom "Erreur lors du démarrage des services Docker: $_"
     Pop-Location
     exit 1
@@ -101,7 +109,8 @@ $frontendPath = Join-Path $PSScriptRoot "open-webui"
 if (-not (Test-Path $frontendPath)) {
     Write-Warning-Custom "Le répertoire open-webui n'existe pas: $frontendPath"
     Write-Warning-Custom "Le frontend dev ne sera pas démarré"
-} else {
+}
+else {
     Push-Location $frontendPath
     
     try {
@@ -118,7 +127,7 @@ if (-not (Test-Path $frontendPath)) {
         Write-Host "`n📍 URLs d'accès:" -ForegroundColor Cyan
         Write-Host "   - Frontend Dev:  http://localhost:5120" -ForegroundColor Yellow
         Write-Host "   - OpenWebUI:     http://localhost:8080" -ForegroundColor Yellow
-        Write-Host "   - Gateway RAG:   http://localhost:8090" -ForegroundColor Yellow
+        Write-Host "   - Gateway RAG:   http://localhost:8090 (Modèle: Phi-3)" -ForegroundColor Yellow
         Write-Host "   - vLLM Light:    http://localhost:8110" -ForegroundColor Yellow
         Write-Host "   - Qdrant:        http://localhost:8130" -ForegroundColor Yellow
         Write-Host "`n⚠️  Note: vLLM Mistral (port 8100) est ARRÊTÉ." -ForegroundColor Red
@@ -128,11 +137,13 @@ if (-not (Test-Path $frontendPath)) {
         # Démarrer le serveur de dev (bloquant)
         npm run dev
         
-    } catch {
+    }
+    catch {
         Write-Error-Custom "Erreur lors du démarrage du frontend: $_"
         Pop-Location
         exit 1
-    } finally {
+    }
+    finally {
         Pop-Location
     }
 }

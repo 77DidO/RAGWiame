@@ -23,6 +23,7 @@ Démarre l'environnement de développement léger (économie VRAM) avec :
 - ✅ Tous les services Docker de base
 - ❌ vLLM Mistral 7B (ARRÊTÉ)
 - ✅ vLLM Phi-3 mini (modèle léger)
+- ✅ Gateway RAG (Configurée automatiquement pour Phi-3)
 - ✅ Serveur de développement frontend (Vite sur port 5120)
 
 **Utilisation :**
