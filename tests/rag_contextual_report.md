@@ -1,6 +1,6 @@
 # RAG Contextual Quality Report
 
-- API URL: `http://localhost:8090/v1/chat/completions`
+- API URL: `http://localhost:8081/v1/chat/completions`
 - Headers: `X-Use-RAG: true`
 
 ## Résumé

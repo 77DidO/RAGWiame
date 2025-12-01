@@ -9,7 +9,7 @@ import pytest
 import requests
 
 
-GATEWAY_URL = "http://localhost:8090/v1/chat/completions"
+GATEWAY_URL = os.getenv("RAG_GATEWAY_URL", "http://localhost:8081/v1/chat/completions")
 PROJECT_ID = "ED257730"
 
 

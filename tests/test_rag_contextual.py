@@ -12,7 +12,7 @@ import pytest
 import requests
 
 
-API_URL = "http://localhost:8090/v1/chat/completions"
+API_URL = os.getenv("RAG_GATEWAY_URL", "http://localhost:8081/v1/chat/completions")
 HEADERS = {
     "Content-Type": "application/json",
     "X-Use-RAG": "true",
