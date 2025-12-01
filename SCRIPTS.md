@@ -56,33 +56,6 @@ Démarre l'environnement de production avec :
 
 **URLs d'accès :**
 - OpenWebUI: http://localhost:8080
-- Gateway RAG: http://localhost:8090
-- vLLM Mistral: http://localhost:8100
-- Qdrant: http://localhost:8130
-
----
-
-### `stop-all.ps1` - Arrêter Tous les Services
-
-Arrête tous les services Docker (y compris le profil 'light').
-
-**Utilisation :**
-```powershell
-# Arrêter les services (conserver les données)
-.\stop-all.ps1
-
-# Arrêter les services ET supprimer les volumes (⚠️ perte de données)
-.\stop-all.ps1 -RemoveVolumes
-```
-
----
-
-## 🔧 Prérequis
-
-- **Windows 11** avec PowerShell 5.1+
-- **Docker Desktop** installé et démarré
-- **Node.js 18+** et **npm** (pour le dev frontend)
-
 ---
 
 ## 💡 Conseils d'Utilisation
