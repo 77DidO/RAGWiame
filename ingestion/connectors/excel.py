@@ -42,12 +42,8 @@ class ExcelConnector(BaseConnector):
             if self.options.sheet_whitelist
             else excel_file.sheet_names
         )
-        # Validation du chunk_size
-        chunk_size = getattr(self.options, "chunk_size", 10)
-        if chunk_size <= 0:
-            raise ValueError("ExcelConnector chunk_size must be a positive integer")
-        # Log de debug
-        print(f"DEBUG: ExcelConnector.load path={path} chunk_size={chunk_size}", flush=True)
+        
+        print(f"DEBUG: ExcelConnector.load path={path} (semantic chunking enabled)", flush=True)
         
         for sheet_name in sheet_names:
             dataframe = excel_file.parse(sheet_name)
@@ -55,71 +51,258 @@ class ExcelConnector(BaseConnector):
             if dataframe.empty:
                 continue
             
-            headers = dataframe.columns.tolist()
+            # Détecter le total général s'il existe
+            global_total = self._extract_global_total(dataframe, sheet_name)
             
-            # Générer un chunk par bloc de lignes
-            for chunk_idx, start_row in enumerate(range(0, len(dataframe), chunk_size)):
-                end_row = min(start_row + chunk_size, len(dataframe))
-                chunk_df = dataframe.iloc[start_row:end_row]
-                
-                # Convertir en texte lisible avec contexte
-                lines = []
-                lines.append(f"Sheet: {sheet_name}")
-                lines.append(f"Rows {start_row+1}-{end_row} of {len(dataframe)}")
-                lines.append("")
-                
-                # Ajouter les données ligne par ligne avec les en-têtes
-                for row_idx, row in chunk_df.iterrows():
-                    row_lines = []
-                    for col_name in headers:
-                        value = row[col_name]
-                        # Filtrer les valeurs vides ou NaN
-                        if pd.notna(value) and str(value).strip():
-                            # Gestion des en-têtes "Unnamed"
-                            header_str = str(col_name)
-                            is_unnamed = header_str.startswith("Unnamed")
-                            
-                            # Formatage des nombres (ajout de variantes avec espaces pour le RAG)
-                            val_str = str(value)
-                            if isinstance(value, (int, float)):
-                                try:
-                                    # Créer une version avec séparateur de milliers (espace)
-                                    # Ex: 220792.79 -> "220 792"
-                                    int_val = int(value)
-                                    if int_val > 999:
-                                        space_fmt = f"{int_val:_}".replace("_", " ")
-                                        val_str = f"{value} (format lisible: {space_fmt})"
-                                except Exception:
-                                    pass
-
-                            if is_unnamed:
-                                # Si pas d'en-tête, on met juste la valeur
-                                row_lines.append(f"{val_str}")
-                            else:
-                                row_lines.append(f"{header_str}: {val_str}")
-                                
-                    if row_lines:  # Seulement si la ligne a des données
-                        lines.append(f"Row {row_idx + 1}:")
-                        lines.extend([f"  - {line}" for line in row_lines])
-                        lines.append("")
-                
-                text = "\n".join(lines)
-                
-                # Ne créer un chunk que s'il y a des données
-                if len(lines) > 3:  # Plus que juste l'en-tête
-                    metadata = {
-                        "source": str(path),
-                        "sheet": sheet_name,
-                        "document_type": self.document_type,
-                        "chunk_index": chunk_idx,
-                        "start_row": start_row + 1,
-                        "end_row": end_row,
-                    }
-                    yield DocumentChunk(
-                        id=f"{path.stem}-{sheet_name}-chunk{chunk_idx}",
-                        text=text,
-                        metadata=metadata,
+            # Détecter les sections dans le tableau
+            sections = self._detect_sections(dataframe)
+            
+            if sections:
+                # Chunking par section sémantique
+                print(f"DEBUG: Found {len(sections)} sections in {sheet_name}", flush=True)
+                for chunk_idx, section in enumerate(sections):
+                    chunk_text = self._format_section_chunk(
+                        dataframe, 
+                        section, 
+                        sheet_name, 
+                        global_total
                     )
+                    
+                    if chunk_text:
+                        metadata = {
+                            "source": str(path),
+                            "sheet": sheet_name,
+                            "document_type": self.document_type,
+                            "chunk_index": chunk_idx,
+                            "section_name": section.get("name", ""),
+                            "start_row": section["start_row"] + 1,
+                            "end_row": section["end_row"],
+                        }
+                        
+                        # Ajouter le total de section si détecté
+                        if section.get("total"):
+                            metadata["section_total"] = section["total"]
+                        
+                        yield DocumentChunk(
+                            id=f"{path.stem}-{sheet_name}-section{chunk_idx}",
+                            text=chunk_text,
+                            metadata=metadata,
+                        )
+            else:
+                # Fallback: chunking par blocs de lignes (amélioré)
+                print(f"DEBUG: No sections detected in {sheet_name}, using row-based chunking", flush=True)
+                chunk_size = getattr(self.options, "chunk_size", 20)  # Augmenté de 10 à 20
+                
+                for chunk_idx, start_row in enumerate(range(0, len(dataframe), chunk_size)):
+                    end_row = min(start_row + chunk_size, len(dataframe))
+                    chunk_text = self._format_row_chunk(
+                        dataframe, 
+                        start_row, 
+                        end_row, 
+                        sheet_name, 
+                        global_total
+                    )
+                    
+                    if chunk_text:
+                        metadata = {
+                            "source": str(path),
+                            "sheet": sheet_name,
+                            "document_type": self.document_type,
+                            "chunk_index": chunk_idx,
+                            "start_row": start_row + 1,
+                            "end_row": end_row,
+                        }
+                        yield DocumentChunk(
+                            id=f"{path.stem}-{sheet_name}-chunk{chunk_idx}",
+                            text=chunk_text,
+                            metadata=metadata,
+                        )
+
+    def _extract_global_total(self, dataframe: "pd.DataFrame", sheet_name: str) -> str:
+        """Extrait le total général du tableau s'il existe."""
+        import pandas as pd
+        
+        # Chercher dans les dernières lignes
+        for idx in range(max(0, len(dataframe) - 5), len(dataframe)):
+            row = dataframe.iloc[idx]
+            row_text = " ".join([str(v) for v in row if pd.notna(v)]).lower()
+            
+            # Patterns de totaux
+            if any(keyword in row_text for keyword in ["total", "montant total", "total général", "total ht", "total ttc"]):
+                # Extraire les valeurs numériques
+                for val in row:
+                    if pd.notna(val) and isinstance(val, (int, float)) and val > 0:
+                        return f"{val:,.2f} EUR".replace(",", " ")
+        
+        return ""
+
+    def _detect_sections(self, dataframe: "pd.DataFrame") -> list:
+        """Détecte les sections dans le tableau (titres, sous-totaux)."""
+        import pandas as pd
+        import re
+        
+        sections = []
+        current_section = None
+        
+        for idx, row in dataframe.iterrows():
+            row_text = " ".join([str(v) for v in row if pd.notna(v)]).strip().lower()
+            
+            # Détecter un titre de section (ligne avec peu de colonnes remplies, texte en majuscules)
+            non_empty = sum(1 for v in row if pd.notna(v) and str(v).strip())
+            
+            # Pattern de section : ligne avec 1-3 colonnes remplies, contient des mots-clés
+            is_section_header = (
+                non_empty <= 3 and 
+                len(row_text) > 3 and
+                any(keyword in row_text for keyword in [
+                    "section", "chapitre", "partie", "lot", 
+                    "fourniture", "main", "matériel", "travaux",
+                    "sous-traitance", "prestation"
+                ])
+            )
+            
+            # Détecter un sous-total
+            is_subtotal = any(keyword in row_text for keyword in [
+                "sous-total", "sous total", "subtotal", "total partiel"
+            ])
+            
+            if is_section_header:
+                # Sauvegarder la section précédente
+                if current_section:
+                    current_section["end_row"] = idx - 1
+                    sections.append(current_section)
+                
+                # Nouvelle section
+                section_name = row_text.title()
+                current_section = {
+                    "name": section_name,
+                    "start_row": idx,
+                    "end_row": len(dataframe) - 1,  # Par défaut jusqu'à la fin
+                    "total": None
+                }
+            
+            elif is_subtotal and current_section:
+                # Extraire le montant du sous-total
+                for val in row:
+                    if pd.notna(val) and isinstance(val, (int, float)) and val > 0:
+                        current_section["total"] = f"{val:,.2f} EUR".replace(",", " ")
+                        break
+        
+        # Sauvegarder la dernière section
+        if current_section:
+            sections.append(current_section)
+        
+        return sections
+
+    def _format_section_chunk(
+        self, 
+        dataframe: "pd.DataFrame", 
+        section: dict, 
+        sheet_name: str, 
+        global_total: str
+    ) -> str:
+        """Formate un chunk pour une section sémantique."""
+        import pandas as pd
+        
+        lines = []
+        lines.append(f"Sheet: {sheet_name}")
+        
+        if global_total:
+            lines.append(f"TOTAL GÉNÉRAL: {global_total}")
+        
+        lines.append("")
+        lines.append(f"Section: {section['name']}")
+        lines.append(f"Rows {section['start_row'] + 1}-{section['end_row'] + 1}")
+        lines.append("")
+        
+        # Extraire les données de la section
+        section_df = dataframe.iloc[section["start_row"]:section["end_row"] + 1]
+        headers = dataframe.columns.tolist()
+        
+        for row_idx, row in section_df.iterrows():
+            row_lines = []
+            for col_name in headers:
+                value = row[col_name]
+                if pd.notna(value) and str(value).strip():
+                    header_str = str(col_name)
+                    is_unnamed = header_str.startswith("Unnamed")
+                    
+                    # Formatage des nombres
+                    val_str = str(value)
+                    if isinstance(value, (int, float)):
+                        try:
+                            if value > 999:
+                                space_fmt = f"{int(value):_}".replace("_", " ")
+                                val_str = f"{value} (lisible: {space_fmt})"
+                        except Exception:
+                            pass
+                    
+                    if not is_unnamed:
+                        row_lines.append(f"{header_str}: {val_str}")
+                    else:
+                        row_lines.append(val_str)
+            
+            if row_lines:
+                lines.append(f"  • {', '.join(row_lines)}")
+        
+        if section.get("total"):
+            lines.append("")
+            lines.append(f"SOUS-TOTAL {section['name']}: {section['total']}")
+        
+        return "\n".join(lines) if len(lines) > 5 else ""
+
+    def _format_row_chunk(
+        self, 
+        dataframe: "pd.DataFrame", 
+        start_row: int, 
+        end_row: int, 
+        sheet_name: str, 
+        global_total: str
+    ) -> str:
+        """Formate un chunk basé sur des lignes (fallback)."""
+        import pandas as pd
+        
+        chunk_df = dataframe.iloc[start_row:end_row]
+        headers = dataframe.columns.tolist()
+        
+        lines = []
+        lines.append(f"Sheet: {sheet_name}")
+        
+        if global_total:
+            lines.append(f"TOTAL GÉNÉRAL: {global_total}")
+        
+        lines.append(f"Rows {start_row + 1}-{end_row} of {len(dataframe)}")
+        lines.append("")
+        
+        for row_idx, row in chunk_df.iterrows():
+            row_lines = []
+            for col_name in headers:
+                value = row[col_name]
+                if pd.notna(value) and str(value).strip():
+                    header_str = str(col_name)
+                    is_unnamed = header_str.startswith("Unnamed")
+                    
+                    val_str = str(value)
+                    if isinstance(value, (int, float)):
+                        try:
+                            if value > 999:
+                                space_fmt = f"{int(value):_}".replace("_", " ")
+                                val_str = f"{value} (lisible: {space_fmt})"
+                        except Exception:
+                            pass
+                    
+                    if not is_unnamed:
+                        row_lines.append(f"{header_str}: {val_str}")
+                    else:
+                        row_lines.append(val_str)
+            
+            if row_lines:
+                lines.append(f"Row {row_idx + 1}:")
+                lines.extend([f"  - {line}" for line in row_lines])
+                lines.append("")
+        
+        return "\n".join(lines) if len(lines) > 3 else ""
+
 
     def _truncate(self, dataframe: "pd.DataFrame") -> "pd.DataFrame":
         rows = self.options.max_rows

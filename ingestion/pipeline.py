@@ -7,9 +7,14 @@ from ingestion.config import DEFAULT_CONFIG, IngestionConfig
 from ingestion.connectors.base import BaseConnector, DocumentChunk
 from ingestion.connectors.docx import DocxConnector
 from ingestion.connectors.excel import ExcelConnector
-from ingestion.connectors.mariadb import MariaDBConnector
 from ingestion.connectors.pdf import PDFConnector
 from ingestion.connectors.text import TextConnector
+
+# Import optionnel de MariaDB
+try:
+    from ingestion.connectors.mariadb import MariaDBConnector
+except ImportError:
+    MariaDBConnector = None  # type: ignore
 
 from ingestion.text_processor import TextProcessor
 from ingestion.structure_detector import StructureDetector
@@ -34,7 +39,7 @@ class IngestionPipeline:
             connectors.append(PDFConnector(config.pdf))
         if config.excel.enabled:
             connectors.append(ExcelConnector(config.excel, config.excel_options))
-        if config.mariadb_source.enabled:
+        if config.mariadb_source.enabled and MariaDBConnector is not None:
             connectors.append(MariaDBConnector(config.mariadb_source, config.mariadb))
         return connectors
 
@@ -67,7 +72,7 @@ class IngestionPipeline:
                 return []
             text_block = " ".join(general_buffer).strip()
             chunks = []
-            if text_block and not QualityFilter.is_low_quality_chunk(text_block):
+            if text_block and not QualityFilter.is_low_quality_chunk(text_block, chunk_metadata):
                 metadata = dict(chunk_metadata)
                 metadata["chunk_index"] = idx
                 chunk_id = f"{chunk.id}-chunk-{idx}"
@@ -82,7 +87,7 @@ class IngestionPipeline:
             chunks = []
             if current_section and section_buffer:
                 text_block = " ".join(section_buffer).strip()
-                if text_block and not QualityFilter.is_low_quality_chunk(text_block):
+                if text_block and not QualityFilter.is_low_quality_chunk(text_block, chunk_metadata):
                     metadata = dict(chunk_metadata)
                     metadata["chunk_index"] = idx
                     metadata["section_label"] = current_section
@@ -101,7 +106,7 @@ class IngestionPipeline:
                 continue
             if faq_question and a:
                 full_faq_text = f"Question: {faq_question}\nRéponse: {a}"
-                if not QualityFilter.is_low_quality_chunk(full_faq_text):
+                if not QualityFilter.is_low_quality_chunk(full_faq_text, chunk_metadata):
                     metadata = dict(chunk_metadata)
                     metadata["chunk_index"] = idx
                     metadata["faq_question"] = faq_question
