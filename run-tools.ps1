@@ -49,6 +49,9 @@ if (-not (Test-Path $infraPath)) {
 Push-Location $infraPath
 
 try {
+    Write-Info "Construction de l'image pour : $Tool"
+    docker compose --profile tools build $Tool
+    
     Write-Info "Lancement de l'outil : $Tool"
     
     # Lancer le conteneur avec le profil tools

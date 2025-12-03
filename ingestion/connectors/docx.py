@@ -34,16 +34,21 @@ class DocxConnector(BaseConnector):
             raise ImportError("python-docx doit être installé pour utiliser le connecteur DOCX") from exc
 
         document = Document(str(path))
-        for index, paragraph in enumerate(document.paragraphs):
+        full_text = []
+        for paragraph in document.paragraphs:
             text = paragraph.text.strip()
-            if not text:
-                continue
-            metadata = {
-                "source": str(path),
-                "paragraph": index,
-                "document_type": self.document_type,
-            }
-            yield DocumentChunk(id=f"{path.stem}-paragraph-{index}", text=text, metadata=metadata)
+            if text:
+                full_text.append(text)
+        
+        if not full_text:
+            return
+
+        joined_text = "\n".join(full_text)
+        metadata = {
+            "source": str(path),
+            "document_type": self.document_type,
+        }
+        yield DocumentChunk(id=path.stem, text=joined_text, metadata=metadata)
 
 
 __all__ = ["DocxConnector"]

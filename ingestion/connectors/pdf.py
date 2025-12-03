@@ -28,10 +28,20 @@ class PDFConnector(BaseConnector):
 
         with pdfplumber.open(str(path)) as pdf:
             doc_metadata = pdf.metadata or {}
-            for index, page in enumerate(pdf.pages):
+            full_text = []
+            for page in pdf.pages:
                 text = page.extract_text() or ""
-                metadata = self._build_metadata(path, index, doc_metadata)
-                yield DocumentChunk(id=f"{path.stem}-page-{index}", text=text, metadata=metadata)
+                if text:
+                    full_text.append(text)
+            
+            if not full_text:
+                return
+
+            joined_text = "\n".join(full_text)
+            metadata = self._build_metadata(path, 0, doc_metadata)
+            # On retire 'page' des métadonnées car c'est tout le doc
+            metadata.pop("page", None)
+            yield DocumentChunk(id=path.stem, text=joined_text, metadata=metadata)
 
     def _build_metadata(self, path: Path, index: int, info: dict) -> dict:
         metadata: dict = {
