@@ -39,8 +39,14 @@ def prettify_display_path(relative: str) -> str:
     """Make citation labels cleaner (strip conversion suffixes like .txt.xlsx)."""
     normalized = relative.replace("\\", "/")
     name = Path(normalized).name
-    pretty = re.sub(r"\.txt\.(pdf|docx|xlsx|xls|csv)\b", r".\1", name, flags=re.IGNORECASE)
-    pretty = re.sub(r"\.(pdf|docx|xlsx|xls|csv)\.\1\b", r".\1", pretty, flags=re.IGNORECASE)
+    
+    # Remove common double extensions from document conversion
+    # Pattern: .{original_ext}.{converted_ext} -> .{original_ext}
+    pretty = re.sub(r"\.(docx|pdf|xlsx|xls|csv|txt)\.(pdf|docx|xlsx|xls|csv|txt)\b", r".\1", name, flags=re.IGNORECASE)
+    
+    # Also handle triple extensions (rare but possible)
+    pretty = re.sub(r"\.(docx|pdf|xlsx|xls|csv|txt)\.(docx|pdf|xlsx|xls|csv|txt)\.(docx|pdf|xlsx|xls|csv|txt)\b", r".\1", pretty, flags=re.IGNORECASE)
+    
     if normalized.endswith(name):
         prefix = normalized[: -len(name)]
         return f"{prefix}{pretty}"
@@ -180,6 +186,9 @@ def convert_citations_to_openwebui_format(citations: List[Dict[str, Any]]) -> Li
         relative = relative.replace("\\", "/")
         file_url = f"{PUBLIC_GATEWAY_URL}/files/view?path={quote(relative)}"
         
+        # Clean up the display name (remove double extensions)
+        display_name = prettify_display_path(relative)
+        
         # Extract snippet
         snippet = str(citation.get("snippet", "")).strip()
         
@@ -187,14 +196,14 @@ def convert_citations_to_openwebui_format(citations: List[Dict[str, Any]]) -> Li
         chunk = str(citation.get("chunk", ""))
         page_match = re.search(r'page[_\s]*(\d+)', chunk, re.IGNORECASE)
         
-        metadata = {"source": source}
+        metadata = {"source": display_name}  # Use cleaned name instead of raw source
         if page_match:
             metadata["page"] = int(page_match.group(1))
         
         # Create individual citation entry
         result.append({
             "source": {
-                "name": source,
+                "name": display_name,  # Use cleaned name
                 "embed_url": file_url
             },
             "document": [snippet] if snippet else [],

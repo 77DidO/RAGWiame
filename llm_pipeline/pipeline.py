@@ -20,7 +20,9 @@ from llm_pipeline.prompts import (
     get_chat_prompt,
     get_fiche_prompt,
     get_chiffres_prompt,
+    get_condense_prompt,
 )
+from llm_pipeline.models import ChatMessage
 from llm_pipeline.context_formatting import format_context
 from llm_pipeline.retrieval import hybrid_query as pipeline_hybrid_query, node_id
 from llm_pipeline.text_utils import tokenize, citation_key
@@ -73,12 +75,25 @@ class RagPipeline:
         self.qa_prompt_fiche = PromptTemplate(get_fiche_prompt())
         self.qa_prompt_chiffres = PromptTemplate(get_chiffres_prompt())
         self.chat_prompt = PromptTemplate(get_chat_prompt())
+        self.condense_prompt = PromptTemplate(get_condense_prompt())
 
-
-
-
-
-
+    def condense_question(self, chat_history: List[ChatMessage], question: str) -> str:
+        """Rewrite a follow-up question to be standalone."""
+        if not chat_history:
+            return question
+            
+        history_str = "\n".join([f"{msg.role}: {msg.content}" for msg in chat_history[-4:]]) # Keep last 4 messages context
+        
+        print(f"DEBUG: Rewriting question '{question}' with history...", flush=True)
+        response = self.llm.predict(
+            self.condense_prompt,
+            chat_history=history_str,
+            question=question,
+            stop=["Question :", "\nQuestion :", "Question:", "\nQuestion:"]
+        )
+        rewritten = str(response).strip()
+        print(f"DEBUG: Rewritten question: '{rewritten}'", flush=True)
+        return rewritten
 
     def _cross_encoder_rerank(self, nodes: List, question: str) -> List:
         if self.reranker is None:
@@ -178,6 +193,7 @@ class RagPipeline:
             qa_prompt,
             context=context_text,
             question=question,
+            stop=["Question :", "\nQuestion :", "Question:", "\nQuestion:"]
         )
         citations = []
         for node in relevant_nodes:  # Iterate over relevant_nodes, not original nodes
@@ -193,14 +209,54 @@ class RagPipeline:
             )
         return RagQueryResult(answer=str(response), citations=citations, hits=hits)
 
-    def chat_only(self, question: str) -> str:
-        print(f"DEBUG: chat_only called with question: {question}", flush=True)
+    def chat_only(self, messages: List[ChatMessage] | str) -> str:
+        print(f"DEBUG: chat_only called", flush=True)
         try:
-            response = self.llm.predict(self.chat_prompt, question=question)
+            if isinstance(messages, str):
+                # Fallback for simple string (legacy)
+                prompt = self.chat_prompt.format(question=messages)
+            else:
+                # Manual prompt construction from history to ensure control over stop tokens
+                # Format:
+                # User: ...
+                # Assistant: ...
+                # ...
+                # User: ...
+                # Assistant:
+                
+                # Limit to last 3 exchanges (6 messages) to prevent context overflow
+                recent_messages = messages[-6:] if len(messages) > 6 else messages
+                
+                formatted_history = ""
+                for msg in recent_messages:
+                    role_label = "User" if msg.role == "user" else "Assistant"
+                    formatted_history += f"{role_label}: {msg.content}\n"
+                
+                # Append the final Assistant prompt
+                prompt = f"""Tu es un assistant francophone polyvalent. Réponds de manière claire et concise.
+
+{formatted_history}Assistant:"""
+
+            print(f"DEBUG: chat_only prompt:\n{prompt}", flush=True)
+            
+            response = self.llm.complete(
+                prompt,
+                stop=["User:", "user:", "Assistant:", "assistant:", "\nUser", "\nAssistant"]
+            )
+                
             print(f"DEBUG: chat_only response: '{response}'", flush=True)
-            return str(response)
+            return str(response).strip()
         except Exception as e:
-            print(f"DEBUG: chat_only error: {e}", flush=True)
+            import traceback
+            error_type = type(e).__name__
+            print(f"DEBUG: chat_only error ({error_type}): {e}", flush=True)
+            traceback.print_exc()
+            
+            # Check if it's a connection error
+            if "connect" in str(e).lower() or "connection" in str(e).lower():
+                print(f"ERROR: vLLM connection failed. Is vllm-light running and healthy?", flush=True)
+                return "Le modèle est temporairement indisponible. Veuillez réessayer dans quelques secondes."
+            
             return f"Error: {e}"
 
 

@@ -52,6 +52,13 @@ QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 
 # Hybrid Search
 HYBRID_FUSION = os.getenv("HYBRID_FUSION", "rrf").strip().lower()
-HYBRID_WEIGHT_VECTOR = float(os.getenv("HYBRID_WEIGHT_VECTOR", "0.6"))
-HYBRID_WEIGHT_KEYWORD = float(os.getenv("HYBRID_WEIGHT_KEYWORD", "0.4"))
-HYBRID_BM25_TOP_K = int(os.getenv("HYBRID_BM25_TOP_K", "30"))
+# Optimisé pour documents techniques français: plus de poids sur le vecteur sémantique
+HYBRID_WEIGHT_VECTOR = float(os.getenv("HYBRID_WEIGHT_VECTOR", "0.7"))  # Augmenté de 0.6 à 0.7
+HYBRID_WEIGHT_KEYWORD = float(os.getenv("HYBRID_WEIGHT_KEYWORD", "0.3"))  # Réduit de 0.4 à 0.3
+HYBRID_BM25_TOP_K = int(os.getenv("HYBRID_BM25_TOP_K", "40"))  # Augmenté de 30 à 40 pour meilleur recall
+DEFAULT_USE_HYBRID = os.getenv("DEFAULT_USE_HYBRID", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}

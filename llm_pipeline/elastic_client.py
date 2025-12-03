@@ -47,11 +47,23 @@ def bm25_search(query: str, size: int = 10, filters: Dict[str, str] | None = Non
     The Elasticsearch client is created lazily; if the service is unavailable the
     function returns an empty list instead of raising at import time.
     """
-    must_clauses: List[Dict[str, Any]] = [{"match": {"content": query}}]
+    # Configuration améliorée pour le français
+    must_clauses: List[Dict[str, Any]] = [{
+        "match": {
+            "content": {
+                "query": query,
+                "fuzziness": "AUTO",  # Tolérance aux fautes de frappe
+                "operator": "or",  # Au moins un mot doit matcher
+                "minimum_should_match": "50%"  # Au moins 50% des mots doivent matcher
+            }
+        }
+    }]
+    
     if filters:
         for key, value in filters.items():
             if value:
                 must_clauses.append({"term": {key: value}})
+    
     try:
         client = _get_client()
         if client is None:
