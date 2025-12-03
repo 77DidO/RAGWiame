@@ -267,6 +267,8 @@ services:
       WEBUI_TIMEOUT: "300"
       OLLAMA_REQUEST_TIMEOUT: "300"
       AIOHTTP_CLIENT_TIMEOUT: "300"
+      # Désactiver Ollama pour éviter les erreurs 500 sur /ollama/api/version
+      ENABLE_OLLAMA_API: "false"
 
     networks:
       - rag-net

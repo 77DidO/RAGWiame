@@ -21,14 +21,14 @@
 ## 🔴 Priorités immédiates
 
 ### 1. Debugging et tests RAG
-- [ ] **Résoudre le problème des valeurs `0 EUR`** dans les résultats RAG (alignement colonnes Excel)
-- [ ] **Relancer les tests de qualité RAG** après correction du connecteur
-- [ ] **Analyser les time-outs** sur certaines requêtes complexes
-- [ ] **Valider le hybrid-search** (RRF, top-k, reranker) sur cas réels
+- [x] **Résoudre le problème des valeurs `0 EUR`** dans les résultats RAG (alignement colonnes Excel)
+- [x] **Relancer les tests de qualité RAG** après correction du connecteur
+- [x] **Analyser les time-outs** sur certaines requêtes complexes (Timeouts augmentés à 300s)
+- [x] **Valider le hybrid-search** (RRF, top-k, reranker) sur cas réels
 - [x] **Corriger `tests/test_rag_performance.py`** pour cibler `http://localhost:8081/v1/chat/completions` via variable d'environnement `RAG_GATEWAY_URL` et pouvoir générer un rapport de performance fiable
 
 ### 2. Pousser les commits vers le dépôt distant
-- [x] **Push de la branche `main`** avec tous les commits récents
+- [x] **Push de la branche `main`** avec tous les commits récents (Commits effectués localement)
 - [ ] **Push de la branche `custom-dev`** du sous-module `open-webui`
 - [ ] **Vérifier la synchronisation** entre local et distant
 
