@@ -218,8 +218,8 @@ services:
       SMALL_MODEL_TOP_K: ${SMALL_MODEL_TOP_K:-3}
       RAG_MAX_CHUNK_CHARS: ${RAG_MAX_CHUNK_CHARS:-800}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.0}
-      LLM_TIMEOUT: ${LLM_TIMEOUT:-150}
-      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-300}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
       QDRANT_URL: http://qdrant:6333
       ELASTIC_HOST: ${ELASTIC_HOST:-http://elasticsearch:9200}
       ELASTIC_INDEX: ${ELASTIC_INDEX:-rag_documents}
@@ -231,7 +231,7 @@ services:
       HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
       BYPASS_AUTH: "true"
       ENABLE_RERANKER: ${ENABLE_RERANKER:-true}
-      DEFAULT_USE_RAG: ${DEFAULT_USE_RAG:-true}
+      DEFAULT_USE_RAG: ${DEFAULT_USE_RAG:-false}
       MARIADB_HOST: ${MARIADB_HOST:-mariadb}
       MARIADB_PORT: ${MARIADB_PORT:-3306}
       MARIADB_DB: ${MARIADB_DB:-rag}
@@ -263,6 +263,10 @@ services:
       API_BASE_URL: http://gateway:8081/v1
       ENABLE_SIGNUP: "true"
       CORS_ALLOW_ORIGIN: 'http://localhost:8080;http://localhost:5120;http://localhost:5700;http://127.0.0.1:5700;http://localhost:5720'
+      # Timeouts pour éviter déconnexions WebSocket pendant requêtes RAG longues
+      WEBUI_TIMEOUT: "300"
+      OLLAMA_REQUEST_TIMEOUT: "300"
+      AIOHTTP_CLIENT_TIMEOUT: "300"
 
     networks:
       - rag-net

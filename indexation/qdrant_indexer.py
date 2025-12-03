@@ -13,7 +13,15 @@ from ingestion.config import IngestionConfig
 from ingestion.pipeline import IngestionPipeline
 from llm_pipeline.elastic_client import index_document as es_index_document
 from llama_index.core import Document, StorageContext, VectorStoreIndex
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+# Import corrigé pour HuggingFaceEmbedding
+try:
+    from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+except ImportError:
+    try:
+        from llama_index.legacy.embeddings.huggingface import HuggingFaceEmbedding
+    except ImportError:
+        # Fallback pour les versions plus récentes
+        from llama_index.core.embeddings import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 

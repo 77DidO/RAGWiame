@@ -63,7 +63,13 @@ try {
     Write-Host "   - LLM principal : vLLM Mistral 7B (port 8100)" -ForegroundColor Gray
     Write-Host "   - Gateway RAG : port 8090" -ForegroundColor Gray
     Write-Host "   - OpenWebUI : port 8080" -ForegroundColor Gray
-    Write-Host "`n   ⚠️  vLLM Light (Phi-3) n'est PAS démarré" -ForegroundColor Yellow
+    Write-Host "   ⚠️  vLLM Light (Phi-3) n'est PAS démarré" -ForegroundColor Yellow
+    
+    # Configurer explicitement la Gateway pour utiliser Mistral
+    Write-Info "Configuration de la Gateway pour Mistral..."
+    $env:RAG_MODEL_ID = "mistral"
+    $env:VLLM_ENDPOINT = "http://vllm:8000/v1"
+    $env:ENABLE_SMALL_MODEL = "false"
     
     docker compose --profile mistral up -d
     

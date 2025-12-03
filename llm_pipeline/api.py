@@ -34,7 +34,9 @@ from llm_pipeline.config import (
     DATA_ROOT,
     BYPASS_AUTH,
     KEYCLOAK_URL,
+    KEYCLOAK_URL,
     QDRANT_URL,
+    DEFAULT_USE_HYBRID,
 )
 from llm_pipeline.models import (
     QueryPayload,
@@ -223,7 +225,7 @@ async def chat_completions(
 
     use_hybrid = normalize_bool(
         use_hybrid_header if use_hybrid_header is not None else (request.metadata.get("use_hybrid") if request.metadata else None),
-        default=False,
+        default=DEFAULT_USE_HYBRID,
     )
 
     payload = QueryPayload(
@@ -235,7 +237,23 @@ async def chat_completions(
     )
     print(f"DEBUG: Incoming metadata: {request.metadata}", flush=True)
     print(f"DEBUG: Resolved use_rag: {payload.use_rag}", flush=True)
-    result = _execute_query(payload, request.model, use_hybrid=use_hybrid)
+
+    # Extract history (all messages except the last one)
+    history = request.messages[:-1]
+
+    if not use_rag:
+        # Chat Mode: Pass full history to LLM
+        pipeline = get_pipeline(request.model)
+        answer_text = pipeline.chat_only(request.messages)
+        result = QueryResponse(answer=answer_text, citations=[])
+    else:
+        # RAG Mode: Rewrite question if history exists
+        if history:
+            pipeline = get_pipeline(request.model)
+            payload.question = pipeline.condense_question(history, payload.question)
+        
+        # Execute RAG with (potentially rewritten) question
+        result = _execute_query(payload, request.model, use_hybrid=use_hybrid)
 
     # Convert citations to Open WebUI format
     sources = convert_citations_to_openwebui_format(result.citations)
