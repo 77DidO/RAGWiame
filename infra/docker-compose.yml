@@ -68,6 +68,14 @@ services:
       HF_TOKEN: ${HF_TOKEN-}
       HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN-}
       VLLM_DOWNLOAD_DIR: /models
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      VLLM_LOGGING_LEVEL: DEBUG
+      NCCL_P2P_DISABLE: 1
+      VLLM_GPU_MEMORY_UTILIZATION: 0.85
+      VLLM_WORKER_MULTIPROC_METHOD: spawn
+      VLLM_ENFORCE_EAGER: "true"
+    shm_size: '8gb'
     deploy:
       resources:
         reservations:

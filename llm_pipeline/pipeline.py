@@ -21,6 +21,9 @@ from llm_pipeline.prompts import (
     get_fiche_prompt,
     get_chiffres_prompt,
     get_condense_prompt,
+    get_phi3_default_prompt,
+    get_phi3_fiche_prompt,
+    get_phi3_chiffres_prompt,
 )
 from llm_pipeline.models import ChatMessage
 from llm_pipeline.context_formatting import format_context
@@ -71,9 +74,17 @@ class RagPipeline:
         self.reranker = CrossEncoderReranker() if enable_reranker else None
 
         # Prompts pour les différents types de questions
-        self.qa_prompt = PromptTemplate(get_default_prompt())
-        self.qa_prompt_fiche = PromptTemplate(get_fiche_prompt())
-        self.qa_prompt_chiffres = PromptTemplate(get_chiffres_prompt())
+        if "phi" in model_name.lower():
+            print(f"DEBUG: Using Phi-3 prompts for model {model_name}", flush=True)
+            self.qa_prompt = PromptTemplate(get_phi3_default_prompt())
+            self.qa_prompt_fiche = PromptTemplate(get_phi3_fiche_prompt())
+            self.qa_prompt_chiffres = PromptTemplate(get_phi3_chiffres_prompt())
+        else:
+            print(f"DEBUG: Using Mistral prompts for model {model_name}", flush=True)
+            self.qa_prompt = PromptTemplate(get_default_prompt())
+            self.qa_prompt_fiche = PromptTemplate(get_fiche_prompt())
+            self.qa_prompt_chiffres = PromptTemplate(get_chiffres_prompt())
+            
         self.chat_prompt = PromptTemplate(get_chat_prompt())
         self.condense_prompt = PromptTemplate(get_condense_prompt())
 
