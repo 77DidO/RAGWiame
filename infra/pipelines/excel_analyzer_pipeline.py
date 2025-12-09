@@ -73,10 +73,14 @@ class Pipeline:
                     schema_text = ""
 
                     if filename.endswith('.csv'):
-                        df_full = pd.read_csv(file_path)
+                        df_raw = pd.read_csv(file_path, header=None)
+                        header_row = self._detect_header_row(df_raw)
+                        df_full = pd.read_csv(file_path, header=header_row)
+                        df_full = self._cleanup_df(df_full)
+                        columns_sql = self._normalize_columns(df_full)
                         total_rows = len(df_full)
                         df_preview = df_full.head(preview_limit)
-                        schema_text = self._generate_sheet_preview(df_preview, "CSV", filename)
+                        schema_text = self._generate_sheet_preview(df_preview, "CSV", filename, columns_sql, total_rows, preview_limit)
 
                         if self.valves.ENABLE_SQL_GENERATION:
                             if cid not in self.db_sessions:
@@ -86,7 +90,7 @@ class Pipeline:
                             safe_name = re.sub(r'[^a-zA-Z0-9]', '_', filename.split('.')[0])
                             table_name = f"csv_{safe_name}"
                             df_full.to_sql(table_name, conn, index=False, if_exists='replace')
-                            tables_info = f"- Fichier CSV -> Table SQL: `{table_name}` ({total_rows} lignes totales, apercu {preview_limit})"
+                            tables_info = f"- Fichier CSV -> Table SQL: `{table_name}` ({total_rows} lignes totales, apercu {preview_limit}) | Colonnes SQL: {', '.join(columns_sql)}"
 
                     else:
                         xls = pd.ExcelFile(file_path)
@@ -94,8 +98,14 @@ class Pipeline:
                         table_names_list: List[str] = []
 
                         for sheet_name in xls.sheet_names:
-                            df_preview = pd.read_excel(xls, sheet_name=sheet_name, header=None, nrows=preview_limit)
-                            preview = self._generate_sheet_preview(df_preview, sheet_name, filename)
+                            df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+                            header_row = self._detect_header_row(df_raw)
+                            df_full = pd.read_excel(xls, sheet_name=sheet_name, header=header_row)
+                            df_full = self._cleanup_df(df_full)
+                            columns_sql = self._normalize_columns(df_full)
+                            total_rows = len(df_full)
+                            df_preview = df_full.head(preview_limit)
+                            preview = self._generate_sheet_preview(df_preview, sheet_name, filename, columns_sql, total_rows, preview_limit)
                             schema_parts.append(preview)
 
                             if self.valves.ENABLE_SQL_GENERATION:
@@ -106,11 +116,9 @@ class Pipeline:
                                 safe_name = re.sub(r'[^a-zA-Z0-9]', '_', sheet_name)
                                 table_name = f"sheet_{safe_name}"
 
-                                df_full = pd.read_excel(xls, sheet_name=sheet_name)
                                 df_full.to_sql(table_name, conn, index=False, if_exists='replace')
-                                total_rows = len(df_full)
                                 table_names_list.append(
-                                    f"- Feuille '{sheet_name}' -> Table SQL: `{table_name}` ({total_rows} lignes totales, apercu {preview_limit})"
+                                    f"- Feuille '{sheet_name}' -> Table SQL: `{table_name}` ({total_rows} lignes totales, apercu {preview_limit}) | Colonnes SQL: {', '.join(columns_sql)}"
                                 )
 
                         schema_text = "\n\n".join(schema_parts)
@@ -141,9 +149,10 @@ APERCU BRUT :
 {ctx['schema_text']}
 
 INSTRUCTIONS :
+- Utilise strictement les noms de colonnes SQL fournis (pas d'espaces, pas d'accents). Si besoin, entoure-les de backticks.
 - Si le nombre total de lignes d'une table est <= {preview_limit}, reponds directement en utilisant ces tableaux.
 - Si une table a plus de {preview_limit} lignes OU que la question demande une liste complete / un total / un comptage global (ex. "liste", "tous les", "total", "combien"), genere un bloc SQL complet (un seul bloc, pas de texte autour) en utilisant les noms de tables indiques plus haut.
-- Si l'aperçu suffit pour repondre (petites tables), ne genere pas de SQL.
+- Toujours indiquer la table cible dans le FROM (ex. `sheet_Feuil1`).
 
 Exemple de reponse SQL uniquement (si besoin de tout le fichier) :
 ```sql
@@ -216,3 +225,40 @@ Je vais intercepter ce code, l'executer sur toutes les lignes, puis te renvoyer 
 {markdown_table}
 """
         return preview
+
+    def _detect_header_row(self, df_raw: pd.DataFrame) -> int:
+        """Try to detect header row by looking for common keywords."""
+        keywords = ["POSTES", "DESIGNATION", "PRIX", "QUANTITE", "TOTAL", "UNITAIRE", "U"]
+        best_row = 0
+        best_score = 0
+        for idx, row in df_raw.iterrows():
+            score = 0
+            for cell in row:
+                cell_str = str(cell).upper()
+                if any(kw in cell_str for kw in keywords):
+                    score += 1
+            if score > best_score:
+                best_score = score
+                best_row = idx
+        return best_row
+
+    def _normalize_columns(self, df: pd.DataFrame) -> List[str]:
+        """Normalize column names to SQL-friendly format."""
+        normalized = []
+        for i, col in enumerate(df.columns):
+            col_str = str(col).strip()
+            if not col_str or col_str.lower().startswith("unnamed"):
+                name = f"col_{i}"
+            else:
+                name = re.sub(r'[^a-zA-Z0-9]+', '_', col_str).strip('_').lower()
+                if not name:
+                    name = f"col_{i}"
+            normalized.append(name)
+        df.columns = normalized
+        return normalized
+
+    def _cleanup_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Remove fully empty rows/cols."""
+        df = df.dropna(axis=0, how="all")
+        df = df.dropna(axis=1, how="all")
+        return df
