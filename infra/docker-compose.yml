@@ -68,14 +68,6 @@ services:
       HF_TOKEN: ${HF_TOKEN-}
       HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN-}
       VLLM_DOWNLOAD_DIR: /models
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-      VLLM_LOGGING_LEVEL: DEBUG
-      NCCL_P2P_DISABLE: 1
-      VLLM_GPU_MEMORY_UTILIZATION: 0.85
-      VLLM_WORKER_MULTIPROC_METHOD: spawn
-      VLLM_ENFORCE_EAGER: "true"
-    shm_size: '8gb'
     deploy:
       resources:
         reservations:
@@ -212,10 +204,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8090:8081"
+      - "5121:8081"
     volumes:
       - ../data/examples:/data:ro
       - ../llm_pipeline:/app/llm_pipeline
     environment:
+      BYPASS_AUTH: "true"
       PUBLIC_GATEWAY_URL: http://localhost:8090
       VLLM_ENDPOINT: ${VLLM_ENDPOINT:-http://vllm:8000/v1}
       RAG_MODEL_ID: ${RAG_MODEL_ID:-mistral}
@@ -233,19 +227,6 @@ services:
       ELASTIC_INDEX: ${ELASTIC_INDEX:-rag_documents}
       HYBRID_FUSION: ${HYBRID_FUSION:-rrf}
       HYBRID_WEIGHT_VECTOR: ${HYBRID_WEIGHT_VECTOR:-0.6}
-      HYBRID_WEIGHT_KEYWORD: ${HYBRID_WEIGHT_KEYWORD:-0.4}
-      HYBRID_BM25_TOP_K: ${HYBRID_BM25_TOP_K:-10}
-      KEYCLOAK_URL: http://keycloak:8080/
-      HF_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-      BYPASS_AUTH: "true"
-      ENABLE_RERANKER: ${ENABLE_RERANKER:-true}
-      DEFAULT_USE_RAG: ${DEFAULT_USE_RAG:-false}
-      MARIADB_HOST: ${MARIADB_HOST:-mariadb}
-      MARIADB_PORT: ${MARIADB_PORT:-3306}
-      MARIADB_DB: ${MARIADB_DB:-rag}
-      MARIADB_USER: ${MARIADB_USER:-rag_user}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-changeme}
-      DATA_ROOT: /data
       ENABLE_INSIGHTS: ${ENABLE_INSIGHTS:-true}
       ENABLE_INVENTORY: ${ENABLE_INVENTORY:-true}
     networks:
@@ -254,6 +235,20 @@ services:
       - qdrant
       - elasticsearch
       - keycloak
+
+  pipelines:
+    image: ghcr.io/open-webui/pipelines:main
+    ports:
+      - "9099:9099"
+    volumes:
+      - ./pipelines:/app/pipelines
+      - ../openwebui_data:/app/backend/data
+    environment:
+      P: "9099"
+      PIPELINES_DIR: "/app/pipelines"
+    networks:
+      - rag-net
+    restart: unless-stopped
 
   openwebui:
     build:
@@ -271,12 +266,10 @@ services:
       API_BASE_URL: http://gateway:8081/v1
       ENABLE_SIGNUP: "true"
       CORS_ALLOW_ORIGIN: 'http://localhost:8080;http://localhost:5120;http://localhost:5700;http://127.0.0.1:5700;http://localhost:5720'
-      # Timeouts pour éviter déconnexions WebSocket pendant requêtes RAG longues
-      WEBUI_TIMEOUT: "300"
-      OLLAMA_REQUEST_TIMEOUT: "300"
-      AIOHTTP_CLIENT_TIMEOUT: "300"
-      # Désactiver Ollama pour éviter les erreurs 500 sur /ollama/api/version
-      ENABLE_OLLAMA_API: "false"
+      AIOHTTP_CLIENT_SESSION_SSL: "false"
+      AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST: "60"
+      ENABLE_CODE_INTERPRETER: "true"
+      CODE_INTERPRETER_ENGINE: "pyodide"
 
     networks:
       - rag-net

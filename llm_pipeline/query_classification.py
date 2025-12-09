@@ -70,4 +70,3 @@ def classify_query_type(question_lower: str) -> str:
 
 
 __all__ = ["classify_query_type"]
-

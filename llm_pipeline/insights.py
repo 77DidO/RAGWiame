@@ -75,6 +75,8 @@ class DocumentInsightService:
                     SELECT source_path, insight_label, value, unit
                     FROM document_insights
                     WHERE insight_type = 'dqe_total'
+                      AND insight_label NOT LIKE '%comparatif%'
+                      AND insight_label NOT LIKE '%comparison%'
                     ORDER BY value DESC
                     LIMIT ?
                     """,
