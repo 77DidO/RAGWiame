@@ -48,8 +48,8 @@ if (-not (Test-Path $infraPath)) {
 Push-Location $infraPath
 
 try {
-    # Arrêter les services avec profil light
-    Write-Info "Arrêt des services Docker (incluant profil 'light')..."
+    # Arrêter tous les services, y compris le conteneur pipelines
+    Write-Info "Arrêt des services Docker (profils 'light'/'mistral'/'tools' + pipelines)..."
     
     if ($RemoveVolumes) {
         docker compose --profile light --profile mistral --profile tools down -v

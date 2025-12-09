@@ -63,6 +63,7 @@ try {
     Write-Host "   - LLM principal : vLLM Mistral 7B (port 8100)" -ForegroundColor Gray
     Write-Host "   - Gateway RAG : port 8090" -ForegroundColor Gray
     Write-Host "   - OpenWebUI : port 8080" -ForegroundColor Gray
+    Write-Host "   - Pipelines (plugins OpenWebUI) : port 9099" -ForegroundColor Gray
     Write-Host "   ⚠️  vLLM Light (Phi-3) n'est PAS démarré" -ForegroundColor Yellow
     
     # Configurer explicitement la Gateway pour utiliser Mistral
@@ -75,6 +76,14 @@ try {
     
     if ($LASTEXITCODE -ne 0) {
         throw "Échec du démarrage des services Docker"
+    }
+    
+    # Toujours relancer le conteneur pipelines pour recharger les filtres Python
+    Write-Info "Relance du service pipelines (port 9099) pour recharger les filtres..."
+    docker compose up -d --force-recreate pipelines
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Échec du démarrage du service pipelines"
     }
     
     Write-Success "Services Docker démarrés avec succès"

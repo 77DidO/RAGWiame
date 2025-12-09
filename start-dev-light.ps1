@@ -73,10 +73,25 @@ try {
 
     # Démarrer les services Docker avec le profil light
     Write-Info "Démarrage des services Docker (avec vllm-light)..."
+    Write-Host "   - Services de base : MariaDB, Keycloak, Qdrant, Elasticsearch" -ForegroundColor Gray
+    Write-Host "   - LLM léger : vLLM Phi-3 mini (port 8110)" -ForegroundColor Gray
+    Write-Host "   - Gateway RAG : port 8090" -ForegroundColor Gray
+    Write-Host "   - OpenWebUI : port 8080" -ForegroundColor Gray
+    Write-Host "   - Pipelines (plugins OpenWebUI) : port 9099" -ForegroundColor Gray
+    Write-Host "   - Frontend dev: port 5120" -ForegroundColor Gray
+    Write-Host "`n   ⚠️  vLLM Mistral (port 8100) est ARRÊTÉ" -ForegroundColor Yellow
     docker compose --profile light up -d
     
     if ($LASTEXITCODE -ne 0) {
         throw "Échec du démarrage des services Docker"
+    }
+
+    # Toujours relancer le conteneur pipelines pour recharger les filtres Python
+    Write-Info "Relance du service pipelines (port 9099) pour recharger les filtres..."
+    docker compose up -d --force-recreate pipelines
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Échec du démarrage du service pipelines"
     }
     
     # vLLM Mistral ne démarre plus par défaut (profil 'mistral' requis)
