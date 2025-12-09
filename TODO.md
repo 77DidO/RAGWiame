@@ -70,3 +70,4 @@
 - Les tâches marquées ✅ ont été complétées lors de la session du 25 novembre 2025
 - Les priorités 🔴 doivent être traitées avant de continuer le développement de nouvelles fonctionnalités
 - Le backlog 📋 contient les améliorations futures planifiées
+ - [ ] Ajouter un mode "SQL forcé" pour le pipeline Excel (bloc SQL obligatoire, garde-fous bloc vide, preview plus longue pour guider le modèle).

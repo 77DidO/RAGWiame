@@ -1,0 +1,1 @@
+{"pipelines": ["*"], "priority": 0, "MAX_ROWS_PREVIEW": 20, "ENABLE_SQL_GENERATION": true}
