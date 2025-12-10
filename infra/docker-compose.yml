@@ -236,16 +236,21 @@ services:
       - elasticsearch
       - keycloak
 
+    restart: unless-stopped
+
   pipelines:
     image: ghcr.io/open-webui/pipelines:main
     ports:
       - "9099:9099"
     volumes:
       - ./pipelines:/app/pipelines
+      - ./src:/app/src
       - ../openwebui_data:/app/backend/data
     environment:
       P: "9099"
       PIPELINES_DIR: "/app/pipelines"
+      PYTHONPATH: "/app/src"
+      PIPELINES_REQUIREMENTS_PATH: "/app/pipelines/requirements.txt"
     networks:
       - rag-net
     restart: unless-stopped

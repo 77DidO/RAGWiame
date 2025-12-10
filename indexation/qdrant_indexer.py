@@ -39,7 +39,11 @@ class QdrantIndexer:
             "HF_EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
         )
         self.client = QdrantClient(url=qdrant_url)
-        self.vector_store = QdrantVectorStore(client=self.client, collection_name=collection_name)
+        self.vector_store = QdrantVectorStore(
+            client=self.client,
+            collection_name=collection_name,
+            vector_name="text-dense",
+        )
         self.embed_model = HuggingFaceEmbedding(model_name=model_name)
 
     def index_documents(self, documents: Sequence[Document]) -> None:

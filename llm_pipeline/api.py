@@ -73,6 +73,7 @@ def _build_index() -> VectorStoreIndex:
     vector_store = QdrantVectorStore(
         client=qdrant_client, 
         collection_name="rag_documents",
+        vector_name="text-dense",
         enable_hybrid=False,
     )
     embed_model = HuggingFaceEmbedding(model_name=EMBEDDING_MODEL)
@@ -255,10 +256,14 @@ async def chat_completions(
         # Execute RAG with (potentially rewritten) question
         result = _execute_query(payload, request.model, use_hybrid=use_hybrid)
 
-    # Convert citations to Open WebUI format
-    sources = convert_citations_to_openwebui_format(result.citations)
+    # Convert citations to Open WebUI format.
+    # Si la reponse indique explicitement que l'info est indisponible, on ne renvoie aucune source.
+    answer_text = result.answer or ""
+    sources = None
+    if "Non disponible dans les documents" not in answer_text:
+        sources = convert_citations_to_openwebui_format(result.citations)
     
-    response_message = ChatMessage(role="assistant", content=result.answer)
+    response_message = ChatMessage(role="assistant", content=answer_text)
     choice = ChatChoice(index=0, finish_reason="stop", message=response_message)
     
     return ChatCompletionResponse(

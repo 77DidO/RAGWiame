@@ -5,13 +5,15 @@
 
 def get_default_prompt() -> str:
     """Prompt for standard RAG answers (Mistral)."""
-    return """[INST] Tu es un assistant qui répond en français à partir du contexte fourni.
+    return """[INST] Tu es un assistant qui repond en francais a partir du contexte fourni.
 
-RÈGLES :
-- Utilise les informations présentes dans le contexte pour répondre
-- Si plusieurs chunks contiennent des parties de la réponse, SYNTHÉTISE-les intelligemment
-- Cite les sources quand tu combines des informations (ex: "D'après le document X...")
-- Si une information est incomplète, explique ce qui manque au lieu de dire simplement "Non spécifié"
+REGLES (zero hallucination) :
+- Utilise UNIQUEMENT les informations presentes dans le contexte pour repondre.
+- Si la reponse n'est pas dans le contexte, reponds strictement : "Non disponible dans les documents."
+- Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
+- Pas de speculation, pas de chiffres inventes.
+- Mentionne la source ou le nom du document lorsque tu utilises une information.
+- Si le contexte est incomplet, explique ce qui manque au lieu d'inventer.
 
 Contexte :
 {context}
@@ -20,32 +22,35 @@ Question : {question} [/INST]"""
 
 
 def get_fiche_prompt() -> str:
-    """Prompt for fiche d'identité style answers (Mistral)."""
-    return """[INST] Tu es un assistant qui synthétise des informations structurées en français.
+    """Prompt for fiche d'identite style answers (Mistral)."""
+    return """[INST] Tu es un assistant qui synthertise des informations structurees en francais.
 
-RÈGLES :
-- Combine les informations présentes dans le contexte pour créer une fiche complète
-- Organise la réponse sous forme de points clés lisibles
-- Si une information spécifique manque, indique "[Information non disponible]" pour ce point uniquement
+REGLES (zero hallucination) :
+- Combine uniquement les informations presentes dans le contexte.
+- Organise la reponse sous forme de points cles lisibles.
+- Si une information specifique manque, indique "[Information non disponible]" pour ce point.
+- Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
+- Mentionne la source ou le nom du document quand c'est pertinent.
+- Aucun contenu invente.
 
 Contexte :
 {context}
 
 Question : {question} [/INST]
-Réponse structurée :"""
+Reponse structuree :"""
 
 
 def get_chiffres_prompt() -> str:
     """Prompt for chiffre (financial) queries (Mistral)."""
-    return """[INST] Tu es un assistant qui extrait et présente des montants et chiffres de manière claire.
+    return """[INST] Tu es un assistant qui extrait et presente des montants et chiffres de maniere claire.
 
-RÈGLES :
-- Fournis les chiffres explicitement mentionnés avec leur contexte complet
-- Si plusieurs chunks mentionnent des parties d'une information, COMBINE-les intelligemment
-- Indique toujours l'unité (EUR, m², etc.) et la source
-- Si tu vois des totaux ou sous-totaux, mentionne-les
-- Si l'information est fragmentée, explique ce qui manque au lieu de dire "Non spécifié"
-- Ne fais pas de calculs, mais tu peux mentionner les totaux déjà calculés dans le contexte
+REGLES (zero hallucination) :
+- Fournis uniquement les chiffres explicites du contexte, avec unite et source.
+- Pas de calcul si non present dans le contexte (ne calcule pas de nouveaux totaux).
+- Si l'information n'est pas disponible, reponds : "Non disponible dans les documents."
+- Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
+- Si l'information est fragmentee, explique ce qui manque.
+- Aucune valeur inventee.
 
 Contexte :
 {context}
@@ -58,13 +63,15 @@ Question : {question} [/INST]"""
 def get_phi3_default_prompt() -> str:
     """Prompt for standard RAG answers (Phi-3)."""
     return """<|user|>
-Tu es un assistant qui répond en français à partir du contexte fourni.
+Tu es un assistant qui repond en francais a partir du contexte fourni.
 
-RÈGLES :
-- Utilise les informations présentes dans le contexte pour répondre
-- Si plusieurs chunks contiennent des parties de la réponse, SYNTHÉTISE-les intelligemment
-- Cite les sources quand tu combines des informations (ex: "D'après le document X...")
-- Si une information est incomplète, explique ce qui manque au lieu de dire simplement "Non spécifié"
+REGLES (zero hallucination) :
+- Utilise UNIQUEMENT les informations presentes dans le contexte pour repondre.
+- Si la reponse n'est pas dans le contexte, reponds strictement : "Non disponible dans les documents."
+- Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
+- Pas de speculation, pas de chiffres inventes.
+- Mentionne la source ou le nom du document lorsque tu utilises une information.
+- Si le contexte est incomplet, explique ce qui manque au lieu d'inventer.
 
 Contexte :
 {context}
@@ -74,33 +81,38 @@ Question : {question} <|end|>
 
 
 def get_phi3_fiche_prompt() -> str:
-    """Prompt for fiche d'identité style answers (Phi-3)."""
+    """Prompt for fiche d'identite style answers (Phi-3)."""
     return """<|user|>
-Tu es un assistant qui synthétise des informations structurées en français.
+Tu es un assistant qui synthertise des informations structurees en francais.
 
-RÈGLES :
-- Combine les informations présentes dans le contexte pour créer une fiche complète
-- Organise la réponse sous forme de points clés lisibles
-- Si une information spécifique manque, indique "[Information non disponible]" pour ce point uniquement
+REGLES (zero hallucination) :
+- Combine uniquement les informations presentes dans le contexte.
+- Organise la reponse sous forme de points cles lisibles.
+- Si une information specifique manque, indique "[Information non disponible]" pour ce point.
+- Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
+- Mentionne la source ou le nom du document quand c'est pertinent.
+- Aucun contenu invente.
 
 Contexte :
 {context}
 
 Question : {question} <|end|>
 <|assistant|>
-Réponse structurée :"""
+Reponse structuree :"""
 
 
 def get_phi3_chiffres_prompt() -> str:
     """Prompt for chiffre (financial) queries (Phi-3)."""
     return """<|user|>
-Tu es un assistant qui extrait et présente des montants et chiffres de manière claire.
+Tu es un assistant qui extrait et presente des montants et chiffres de maniere claire.
 
-RÈGLES :
-- Fournis les chiffres explicitement mentionnés avec leur contexte complet
-- Si plusieurs chunks mentionnent des parties d'une information, COMBINE-les intelligemment
-- Indique toujours l'unité (EUR, m², etc.) et la source
-- Si tu vois des totaux ou sous-totaux, mentionne-les
+REGLES (zero hallucination) :
+- Fournis uniquement les chiffres explicites du contexte, avec unite et source.
+- Pas de calcul si non present dans le contexte (ne calcule pas de nouveaux totaux).
+- Si l'information n'est pas disponible, reponds : "Non disponible dans les documents."
+- Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
+- Si l'information est fragmentee, explique ce qui manque.
+- Aucune valeur inventee.
 
 Contexte :
 {context}
@@ -111,26 +123,26 @@ Question : {question} <|end|>
 
 def get_condense_prompt() -> str:
     """Prompt to rewrite a follow-up question into a standalone question."""
-    return """[INST] Tu es un assistant utile. Ta tâche est de reformuler la dernière question d'une conversation pour qu'elle soit compréhensible sans l'historique.
+    return """[INST] Tu es un assistant utile. Ta tache est de reformuler la derniere question d'une conversation pour qu'elle soit comprehensible sans l'historique.
 
-RÈGLES :
-- Remplace les pronoms (il, elle, son, sa...) par les noms auxquels ils font référence dans l'historique
-- Garde la question en français
-- Ne réponds PAS à la question, reformule-la seulement
-- Si la question est déjà claire, recopie-la telle quelle
+REGLES :
+- Remplace les pronoms (il, elle, son, sa...) par les noms auxquels ils font reference dans l'historique
+- Garde la question en francais
+- Ne reponds PAS a la question, reformule-la seulement
+- Si la question est deja claire, recopie-la telle quelle
 
 Historique de la conversation :
 {chat_history}
 
-Dernière question : {question} [/INST]
-Question reformulée :"""
+Derniere question : {question} [/INST]
+Question reformulee :"""
 
 
 def get_chat_prompt() -> str:
     """Simple chat prompt without context."""
-    return """[INST] Tu es un assistant francophone polyvalent. Réponds de manière claire et concise.
+    return """[INST] Tu es un assistant francophone polyvalent. Reponds de maniere claire et concise.
 Question : {question} [/INST]
-Réponse :"""
+Reponse :"""
 
 
 # Mapping for easy lookup
