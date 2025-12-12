@@ -35,6 +35,11 @@ Vous pouvez ajuster ces valeurs dans `ingestion/config.py` ou dans un fichier JS
 docker compose -f infra/docker-compose.yml run --rm ingestion
 docker compose -f infra/docker-compose.yml run --rm indexation
 ```
+Pour repartir d'une base propre (suppression de la collection Qdrant + index BM25), reconstruisez l'image puis passez `-- --purge` (les arguments après `--` sont transmis au script Python) :
+```powershell
+docker compose -f infra/docker-compose.yml build indexation
+docker compose -f infra/docker-compose.yml run --rm indexation -- --purge
+```
 
 Conseils :
 
@@ -47,6 +52,12 @@ Conseils :
 - Les journaux restent disponibles via `docker compose -f infra/docker-compose.yml logs -f ingestion`.
 
 À la fin, `data/examples/.processed` liste les fichiers déjà traités, ce qui évite de les réingérer par mégarde.
+
+### Métadonnées AO & filtres d’exclusion
+
+- Les connecteurs ajoutent automatiquement les champs `ao_id`, `ao_commune`, `ao_objet`, `ao_phase_code`, `ao_phase_label`, `ao_section`, `ao_doc_code`, `ao_doc_role`, `ao_signed`, `spigao_batch_id`, etc. Le nommage repose sur la structure `data/examples/AO/<ID - Commune - Objet>/...`. Les documents transverses (hors dossier AO) reçoivent `ao_is_global_doc=true`.
+- Les fichiers d’archives ou formats applicatifs (`.zip`, `.rar`, `.bak`, `.old`, `.cnf`, `.dat`, `.xnf`, `.mpp`, `.msg`, images, dossiers `Sauvegarde/`) sont ignorés par défaut. Vous pouvez compléter la liste via `ConnectorConfig.excluded_extensions` ou `extra["excluded_keywords"]`.
+- Ces métadonnées se retrouvent dans Qdrant/Elasticsearch et permettent de filtrer par AO dans l’API (`{"filters":{"ao_id":"ED258025","ao_phase_code":"09"}}`).
 
 ## 4. Mini UI d'upload (FastAPI)
 
@@ -129,6 +140,7 @@ Les filtres (`must`, `should`, `must_not`) suivent la syntaxe officielle Qdrant.
    docker compose -f infra/docker-compose.yml run --rm ingestion
    docker compose -f infra/docker-compose.yml run --rm indexation
    ```
+   Alternative rapide : `docker compose -f infra/docker-compose.yml run --rm -e INDEXATION_PURGE=true indexation` supprime et recrée automatiquement la collection et l'index avant de réinjecter les données.
 
 Cette procédure est recommandée lorsque vous changez de modèle d’embedding ou que vous souhaitez repartir d’un état propre.
 
