@@ -1,0 +1,374 @@
+{
+    "test_suite": {
+        "name": "RAG Quality Assessment - WIAME VRD",
+        "date": "2025-12-05",
+        "documents": [
+            "WIAME-VRD.txt",
+            "DQE Aménagement sécuritaire Av de l'Empereur_Montmirail",
+            "WIAME VRD - Présentation de l'entreprise.docx"
+        ],
+        "questions": [
+            {
+                "id": 1,
+                "category": "factual_simple",
+                "question": "Quel est le nom complet de l'entreprise WIAME ?",
+                "expected_type": "company_info",
+                "expected_sources": [
+                    "WIAME-VRD.txt"
+                ],
+                "difficulty": "easy"
+            },
+            {
+                "id": 2,
+                "category": "factual_simple",
+                "question": "Quel est le projet concerné par l'Avenue de l'Empereur à Montmirail ?",
+                "expected_type": "project_info",
+                "expected_sources": [
+                    "DQE"
+                ],
+                "difficulty": "easy"
+            },
+            {
+                "id": 3,
+                "category": "financial_simple",
+                "question": "Quel est le montant total du DQE pour le projet Avenue de l'Empereur ?",
+                "expected_type": "amount",
+                "expected_sources": [
+                    "DQE Aménagement sécuritaire Av de l'Empereur_Montmirail"
+                ],
+                "difficulty": "medium",
+                "notes": "Vérifier que le LLM trouve le TOTAL dans le DQE Excel"
+            },
+            {
+                "id": 4,
+                "category": "financial_complex",
+                "question": "Quels sont les 3 postes les plus coûteux du DQE Montmirail ?",
+                "expected_type": "ranking",
+                "expected_sources": [
+                    "DQE"
+                ],
+                "difficulty": "hard",
+                "notes": "Nécessite agrégation et tri"
+            },
+            {
+                "id": 5,
+                "category": "synthesis",
+                "question": "Résume les principales activités de l'entreprise WIAME VRD",
+                "expected_type": "summary",
+                "expected_sources": [
+                    "WIAME-VRD.txt",
+                    "Présentation entreprise"
+                ],
+                "difficulty": "medium"
+            },
+            {
+                "id": 6,
+                "category": "metadata",
+                "question": "Quels documents concernent le projet Montmirail ?",
+                "expected_type": "document_list",
+                "expected_sources": [
+                    "multiple"
+                ],
+                "difficulty": "medium",
+                "notes": "Tester le filtrage par métadonnées project_names"
+            },
+            {
+                "id": 7,
+                "category": "metadata",
+                "question": "Quels sont tous les projets disponibles dans la base de documents ?",
+                "expected_type": "project_list",
+                "expected_sources": [
+                    "multiple"
+                ],
+                "difficulty": "easy",
+                "notes": "Tester l'extraction des métadonnées project_names"
+            },
+            {
+                "id": 8,
+                "category": "financial_complex",
+                "question": "Compare les montants entre les différentes versions du DQE Montmirail",
+                "expected_type": "comparison",
+                "expected_sources": [
+                    "DQE versions"
+                ],
+                "difficulty": "hard",
+                "notes": "Vérifier si le système peut distinguer les versions"
+            },
+            {
+                "id": 9,
+                "category": "technical",
+                "question": "Quels sont les types de travaux prévus pour l'Avenue de l'Empereur ?",
+                "expected_type": "work_description",
+                "expected_sources": [
+                    "DQE",
+                    "Consultation"
+                ],
+                "difficulty": "medium"
+            },
+            {
+                "id": 10,
+                "category": "edge_case_refusal",
+                "question": "Quel est le chiffre d'affaires de Google en 2024 ?",
+                "expected_answer": "Je n'ai pas trouvé l'information dans les documents",
+                "expected_type": "refusal",
+                "difficulty": "easy",
+                "notes": "Doit refuser de répondre (hors corpus)"
+            },
+            {
+                "id": 11,
+                "category": "edge_case_refusal",
+                "question": "Combien coûte le projet de la Tour Eiffel ?",
+                "expected_answer": "Je n'ai pas trouvé l'information dans les documents",
+                "expected_type": "refusal",
+                "difficulty": "easy",
+                "notes": "Doit refuser (projet inexistant)"
+            },
+            {
+                "id": 12,
+                "category": "factual_address",
+                "question": "Où se trouve le siège de l'entreprise WIAME ?",
+                "expected_type": "address",
+                "expected_sources": [
+                    "WIAME-VRD.txt",
+                    "Présentation"
+                ],
+                "difficulty": "easy"
+            },
+            {
+                "id": 13,
+                "category": "synthesis",
+                "question": "Quels sont les documents de consultation disponibles pour le projet Montmirail ?",
+                "expected_type": "document_list",
+                "expected_sources": [
+                    "consultation Avenue de l empereur.pdf"
+                ],
+                "difficulty": "medium"
+            },
+            {
+                "id": 14,
+                "category": "financial_detail",
+                "question": "Quel est le prix unitaire de la résine sablée dans le DQE Montmirail ?",
+                "expected_type": "unit_price",
+                "expected_sources": [
+                    "DQE"
+                ],
+                "difficulty": "hard",
+                "notes": "Nécessite extraction précise d'une ligne du DQE"
+            },
+            {
+                "id": 15,
+                "category": "metadata_company",
+                "question": "Quelles entreprises sont mentionnées dans les documents ?",
+                "expected_type": "company_list",
+                "expected_sources": [
+                    "multiple"
+                ],
+                "difficulty": "medium",
+                "notes": "Tester l'extraction des métadonnées company_names"
+            }
+        ],
+        "conversational_scenarios": [
+            {
+                "scenario_id": "S1",
+                "name": "Exploration du projet Montmirail",
+                "description": "Série de questions approfondies sur un projet spécifique",
+                "turns": [
+                    {
+                        "turn": 1,
+                        "question": "Parle-moi du projet Avenue de l'Empereur à Montmirail",
+                        "expected_type": "project_overview",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 2,
+                        "question": "Quel est son montant total ?",
+                        "expected_type": "amount",
+                        "context_needed": true,
+                        "notes": "Doit comprendre que 'son' fait référence au projet Montmirail"
+                    },
+                    {
+                        "turn": 3,
+                        "question": "Quels sont les principaux postes de dépenses ?",
+                        "expected_type": "breakdown",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 4,
+                        "question": "Y a-t-il plusieurs versions du DQE ?",
+                        "expected_type": "document_versions",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 5,
+                        "question": "Quelle est la différence entre ces versions ?",
+                        "expected_type": "comparison",
+                        "context_needed": true
+                    }
+                ]
+            },
+            {
+                "scenario_id": "S2",
+                "name": "Analyse financière comparative",
+                "description": "Questions sur les montants avec comparaisons",
+                "turns": [
+                    {
+                        "turn": 1,
+                        "question": "Quel est le montant total du projet Montmirail ?",
+                        "expected_type": "amount",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 2,
+                        "question": "Quels sont les 3 postes les plus chers ?",
+                        "expected_type": "ranking",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 3,
+                        "question": "Combien représente le poste le plus cher en pourcentage du total ?",
+                        "expected_type": "calculation",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 4,
+                        "question": "Y a-t-il d'autres projets dans la base ?",
+                        "expected_type": "project_list",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 5,
+                        "question": "Compare leurs montants",
+                        "expected_type": "comparison",
+                        "context_needed": true
+                    }
+                ]
+            },
+            {
+                "scenario_id": "S3",
+                "name": "Découverte de l'entreprise WIAME",
+                "description": "Questions sur l'entreprise avec approfondissement",
+                "turns": [
+                    {
+                        "turn": 1,
+                        "question": "Qui est WIAME ?",
+                        "expected_type": "company_overview",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 2,
+                        "question": "Quelles sont ses principales activités ?",
+                        "expected_type": "activities",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 3,
+                        "question": "Où se trouve son siège social ?",
+                        "expected_type": "address",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 4,
+                        "question": "Sur quels projets a-t-elle travaillé ?",
+                        "expected_type": "project_list",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 5,
+                        "question": "Donne-moi plus de détails sur le premier projet",
+                        "expected_type": "project_detail",
+                        "context_needed": true
+                    }
+                ]
+            },
+            {
+                "scenario_id": "S4",
+                "name": "Recherche de documents spécifiques",
+                "description": "Navigation dans les documents avec filtrage",
+                "turns": [
+                    {
+                        "turn": 1,
+                        "question": "Quels types de documents sont disponibles ?",
+                        "expected_type": "document_types",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 2,
+                        "question": "Montre-moi les DQE",
+                        "expected_type": "document_list",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 3,
+                        "question": "Lequel concerne Montmirail ?",
+                        "expected_type": "document_filter",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 4,
+                        "question": "Quel est son montant total ?",
+                        "expected_type": "amount",
+                        "context_needed": true
+                    }
+                ]
+            },
+            {
+                "scenario_id": "S5",
+                "name": "Test de robustesse - Changements de contexte",
+                "description": "Alternance entre sujets pour tester la mémoire contextuelle",
+                "turns": [
+                    {
+                        "turn": 1,
+                        "question": "Quel est le montant du projet Montmirail ?",
+                        "expected_type": "amount",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 2,
+                        "question": "Qui est WIAME ?",
+                        "expected_type": "company_overview",
+                        "context_needed": false,
+                        "notes": "Changement de sujet"
+                    },
+                    {
+                        "turn": 3,
+                        "question": "Reviens au projet précédent, quels sont ses postes principaux ?",
+                        "expected_type": "breakdown",
+                        "context_needed": true
+                    },
+                    {
+                        "turn": 4,
+                        "question": "Et l'adresse de l'entreprise ?",
+                        "expected_type": "address",
+                        "context_needed": true
+                    }
+                ]
+            },
+            {
+                "scenario_id": "S6",
+                "name": "Questions pièges en contexte",
+                "description": "Tester les refus appropriés dans une conversation",
+                "turns": [
+                    {
+                        "turn": 1,
+                        "question": "Parle-moi du projet Montmirail",
+                        "expected_type": "project_overview",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 2,
+                        "question": "Quel est le budget de la Tour Eiffel ?",
+                        "expected_answer": "Je n'ai pas trouvé l'information",
+                        "expected_type": "refusal",
+                        "context_needed": false
+                    },
+                    {
+                        "turn": 3,
+                        "question": "OK, reviens au projet Montmirail. Quel est son montant ?",
+                        "expected_type": "amount",
+                        "context_needed": true
+                    }
+                ]
+            }
+        ]
+    }
+}
