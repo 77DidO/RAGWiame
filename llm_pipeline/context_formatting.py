@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict
 import re
 import json
 from llm_pipeline.text_utils import tokenize, citation_key
@@ -63,9 +63,10 @@ def format_context(
     nodes: List, 
     question: str, 
     max_chunk_chars: int = 800, 
-    top_k: int = 6
+    top_k: int = 6,
+    max_chunks_per_source: int = 2,
 ) -> Tuple[str, Dict[str, str]]:
-    """Format context from nodes, deduplicating by source and removing XML tags."""
+    """Format context from nodes, permettant plusieurs extraits par source (jusqu'à max_chunks_per_source)."""
     
     # Extract keywords for relevance filtering
     keywords = [kw for kw in tokenize(question) if len(kw) > 2]
@@ -73,7 +74,7 @@ def format_context(
     chunks: List[str] = []
     snippet_map: Dict[str, str] = {}
     citation_idx_map: Dict[str, int] = {}
-    seen_sources: Set[str] = set()
+    per_source_counts: Dict[str, int] = {}
     
     for node in nodes:
         # Stop if we have enough chunks
@@ -82,17 +83,18 @@ def format_context(
             
         metadata = getattr(node, "metadata", {}) or {}
         source = metadata.get("source", "inconnu")
+        count_for_source = per_source_counts.get(source, 0)
         
-        # Deduplication: one snippet per source file
-        if source in seen_sources:
+        # Limiter le nombre d'extraits par fichier pour ne pas perdre d'information clé
+        if count_for_source >= max_chunks_per_source:
             continue
             
         text = _extract_node_text(node)
         if not text:
             continue
             
-        # Mark source as seen
-        seen_sources.add(source)
+        # Update counter for this source
+        per_source_counts[source] = count_for_source + 1
         
         # Assign citation number
         if source not in citation_idx_map:

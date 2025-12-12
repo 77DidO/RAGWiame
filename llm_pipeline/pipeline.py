@@ -26,7 +26,7 @@ from llm_pipeline.prompts import (
     get_phi3_chiffres_prompt,
 )
 from llm_pipeline.models import ChatMessage
-from llm_pipeline.context_formatting import format_context
+from llm_pipeline.context_formatting import format_context, _extract_node_text
 from llm_pipeline.retrieval import hybrid_query as pipeline_hybrid_query, node_id
 from llm_pipeline.text_utils import tokenize, citation_key
 from llm_pipeline.reranker import CrossEncoderReranker
@@ -157,6 +157,10 @@ class RagPipeline:
             nodes = retriever.retrieve(query_bundle)
             query_text = query_bundle.query_str
 
+        if "effectif" in question_lower:
+            keyword_nodes = _keyword_search_nodes(["effectif", "effectifs"])
+            nodes = _merge_unique_nodes(nodes, keyword_nodes)
+
         if not nodes:
             return RagQueryResult(
                 answer="Je n'ai pas trouvé de documents pertinents pour répondre à cette question.",
@@ -164,6 +168,9 @@ class RagPipeline:
             )
 
         reranked = self._cross_encoder_rerank(nodes, query_text)
+
+        if question_type == "question_chiffree":
+            reranked = _prioritize_numeric_nodes(reranked, nodes, self.top_k)
         
         # Check relevance threshold
         MIN_RELEVANCE_SCORE = float(os.getenv("MIN_RELEVANCE_SCORE", "0.1"))
@@ -271,6 +278,115 @@ class RagPipeline:
             return f"Error: {e}"
 
 
+NUMERIC_KEYWORDS = [
+    "chiffre d'",
+    "chiffres d'",
+    "c.a",
+    "ca ",
+    "effectif",
+    "effectifs",
+    " m\u20ac",
+    " k\u20ac",
+    " en m\u20ac",
+    " en k\u20ac",
+    "montant",
+    "total groupe",
+]
+
+
+def _contains_numeric_signal(node) -> tuple[bool, bool]:
+    """Detecte la presence d'indications chiffrées dans un chunk."""
+    text = _extract_node_text(node).lower()
+    if not text:
+        return False, False
+    contains_keyword = any(keyword in text for keyword in NUMERIC_KEYWORDS)
+    contains_effectif = "effectif" in text
+    if contains_keyword or ("?" in text and any(ch.isdigit() for ch in text)):
+        return True, contains_effectif
+    return False, False
+
+
+def _prioritize_numeric_nodes(primary_nodes: List, candidate_nodes: List, limit: int) -> List:
+    """Injecte les nodes contenant des chiffres avant le rerank final."""
+    if limit <= 0:
+        return primary_nodes
+
+    effectif_nodes: List = []
+    numeric_nodes: List = []
+    ordered: List = []
+    seen = set()
+
+    def push(node, bucket: List) -> None:
+        key = node_id(node)
+        if key in seen:
+            return
+        bucket.append(node)
+        seen.add(key)
+
+    for node in primary_nodes:
+        numeric, has_effectif = _contains_numeric_signal(node)
+        if has_effectif:
+            push(node, effectif_nodes)
+        elif numeric:
+            push(node, numeric_nodes)
+
+    for node in candidate_nodes:
+        numeric, has_effectif = _contains_numeric_signal(node)
+        if has_effectif:
+            push(node, effectif_nodes)
+        elif numeric:
+            push(node, numeric_nodes)
+
+    for node in primary_nodes:
+        key = node_id(node)
+        if key in seen:
+            continue
+        ordered.append(node)
+        seen.add(key)
+
+    ordered = effectif_nodes + numeric_nodes + ordered
+    return ordered[:limit]
+
+
+def _keyword_search_nodes(queries: List[str], size: int = 5) -> List:
+    """Ex‚cute des recherches BM25 cibl‚es et renvoie les nodes correspondants."""
+    nodes: List = []
+    for query in queries:
+        hits = bm25_search(query, size=size) if bm25_search else []
+        for hit in hits:
+            source = hit.get("_source", {}) or {}
+            text = str(source.get("content", ""))
+            metadata = dict(source)
+            metadata.pop("content", None)
+            node_id_value = str(hit.get("_id", ""))
+            score = float(hit.get("_score", 0.0))
+            nodes.append(
+                type(
+                    "KeywordNode",
+                    (),
+                    {
+                        "id_": node_id_value,
+                        "metadata": metadata,
+                        "text": text,
+                        "score": score,
+                    },
+                )()
+            )
+    return nodes
+
+
+def _merge_unique_nodes(base_nodes: List, extra_nodes: List) -> List:
+    """Fusionne des listes de nodes en ‚vitant les doublons."""
+    if not extra_nodes:
+        return base_nodes
+    seen = {node_id(node) for node in base_nodes}
+    for node in extra_nodes:
+        key = node_id(node)
+        if key in seen:
+            continue
+        base_nodes.append(node)
+        seen.add(key)
+    return base_nodes
 
 
 __all__ = ["RagPipeline", "RagQueryResult"]

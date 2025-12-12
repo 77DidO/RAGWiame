@@ -42,6 +42,19 @@ def index_document(doc_id: str, body: Dict[str, Any]) -> None:
         return
 
 
+def delete_index() -> None:
+    """Supprime l'index Elasticsearch pour repartir d'une base propre."""
+    client = _get_client()
+    if client is None:
+        print("DEBUG: Elasticsearch client not available, skipping index deletion", flush=True)
+        return
+    try:
+        client.indices.delete(index=ELASTIC_INDEX, ignore=[400, 404])
+        print(f"DEBUG: Elasticsearch index '{ELASTIC_INDEX}' deleted", flush=True)
+    except Exception as exc:  # pragma: no cover - depends on ES availability
+        print(f"DEBUG: Failed to delete Elasticsearch index '{ELASTIC_INDEX}': {exc}", flush=True)
+
+
 def bm25_search(query: str, size: int = 10, filters: Dict[str, str] | None = None) -> List[Dict[str, Any]]:
     """Effectuer une recherche BM25 par mots‑clés (optionnellement filtrée).
     The Elasticsearch client is created lazily; if the service is unavailable the
@@ -82,4 +95,4 @@ def bm25_search(query: str, size: int = 10, filters: Dict[str, str] | None = Non
         return []
 
 
-__all__ = ["index_document", "bm25_search", "ELASTIC_HOST", "ELASTIC_INDEX"]
+__all__ = ["index_document", "bm25_search", "delete_index", "ELASTIC_HOST", "ELASTIC_INDEX"]

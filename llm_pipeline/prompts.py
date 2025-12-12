@@ -46,8 +46,9 @@ def get_chiffres_prompt() -> str:
 
 REGLES (zero hallucination) :
 - Fournis uniquement les chiffres explicites du contexte, avec unite et source.
+- Si le contexte contient des montants (ex: chiffres suivis de €, k€, M€ ou %), tu DOIS les citer textuellement en precisant l'annee ou l'intitule mentionne.
 - Pas de calcul si non present dans le contexte (ne calcule pas de nouveaux totaux).
-- Si l'information n'est pas disponible, reponds : "Non disponible dans les documents."
+- Ne reponds "Non disponible dans les documents." que s'il n'y a strictement aucun montant pertinent dans le contexte.
 - Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
 - Si l'information est fragmentee, explique ce qui manque.
 - Aucune valeur inventee.
@@ -108,8 +109,9 @@ Tu es un assistant qui extrait et presente des montants et chiffres de maniere c
 
 REGLES (zero hallucination) :
 - Fournis uniquement les chiffres explicites du contexte, avec unite et source.
+- Si le contexte contient des montants (par exemple des chiffres suivis de €, k€, M€ ou %), tu DOIS les citer textuellement en precisant l'annee ou l'intitule.
 - Pas de calcul si non present dans le contexte (ne calcule pas de nouveaux totaux).
-- Si l'information n'est pas disponible, reponds : "Non disponible dans les documents."
+- Ne reponds "Non disponible dans les documents." que s'il n'y a strictement aucun montant pertinent dans le contexte.
 - Si tu reponds "Non disponible dans les documents.", ne liste pas de sources.
 - Si l'information est fragmentee, explique ce qui manque.
 - Aucune valeur inventee.
