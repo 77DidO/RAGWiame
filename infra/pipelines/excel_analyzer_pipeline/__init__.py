@@ -80,9 +80,7 @@ class Pipeline:
                         columns_sql = self._normalize_columns(df_full)
                         total_rows = len(df_full)
                         df_preview = df_full.head(preview_limit)
-                        schema_text = self._generate_sheet_preview(
-                            df_preview, "CSV", filename, columns_sql, total_rows, preview_limit
-                        )
+                        schema_text = self._generate_sheet_preview(df_preview, "CSV", filename, columns_sql, total_rows, preview_limit)
 
                         if self.valves.ENABLE_SQL_GENERATION:
                             if cid not in self.db_sessions:
@@ -99,7 +97,7 @@ class Pipeline:
                         schema_parts: List[str] = []
                         table_names_list: List[str] = []
 
-                        for idx, sheet_name in enumerate(xls.sheet_names, start=1):
+                        for sheet_name in xls.sheet_names:
                             df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
                             header_row = self._detect_header_row(df_raw)
                             df_full = pd.read_excel(xls, sheet_name=sheet_name, header=header_row)
@@ -107,9 +105,7 @@ class Pipeline:
                             columns_sql = self._normalize_columns(df_full)
                             total_rows = len(df_full)
                             df_preview = df_full.head(preview_limit)
-                            preview = self._generate_sheet_preview(
-                                df_preview, sheet_name, filename, columns_sql, total_rows, preview_limit
-                            )
+                            preview = self._generate_sheet_preview(df_preview, sheet_name, filename, columns_sql, total_rows, preview_limit)
                             schema_parts.append(preview)
 
                             if self.valves.ENABLE_SQL_GENERATION:
@@ -122,7 +118,7 @@ class Pipeline:
 
                                 df_full.to_sql(table_name, conn, index=False, if_exists='replace')
                                 table_names_list.append(
-                                    f"- [{idx}] Feuille '{sheet_name}' -> Table SQL: `{table_name}` ({total_rows} lignes totales, apercu {preview_limit}) | Colonnes SQL: {', '.join(columns_sql)}"
+                                    f"- Feuille '{sheet_name}' -> Table SQL: `{table_name}` ({total_rows} lignes totales, apercu {preview_limit}) | Colonnes SQL: {', '.join(columns_sql)}"
                                 )
 
                         schema_text = "\n\n".join(schema_parts)
@@ -154,15 +150,9 @@ APERCU BRUT :
 
 INSTRUCTIONS :
 - Utilise strictement les noms de colonnes SQL fournis (pas d'espaces, pas d'accents). Si besoin, entoure-les de backticks.
-- Toujours indiquer la table cible dans le FROM (ex. `sheet_Feuil1` ou `sheet_Feuil2`).
 - Si le nombre total de lignes d'une table est <= {preview_limit}, reponds directement en utilisant ces tableaux.
-- Ne reformule pas la question de l'utilisateur.
-- Si la question parle de participants / invites / personnes : utilise SUM sur la colonne qui contient 'nbre_person' ou 'nbre_personne' dans la table qui porte cette colonne (souvent la feuille de liste d'invites). Ignore les autres tables. Exemple : SELECT SUM(CAST(nbre_personne AS REAL)) FROM table WHERE nbre_personne IS NOT NULL;
-- Si la question parle de couchage(s) / lits : utilise SUM sur la colonne qui contient 'couchage' dans la table qui porte cette colonne (souvent la feuille des hebergements). Ignore les autres tables. Exemple : SELECT SUM(CAST(couchage AS REAL)) FROM table WHERE couchage IS NOT NULL;
-- Si l'utilisateur mentionne "second onglet", "deuxieme feuille", "onglet 2", utilise la table numero 2 dans la liste STRUCTURE DES DONNEES (celle qui a l'indice [2]).
-- Si une table a plus de {preview_limit} lignes OU que la question demande une liste complete / un total / un comptage global (ex. "liste", "tous les", "total", "combien", "combien de couchages", "combien de participants"), genere exactement UN bloc SQL complet (un seul bloc, pas de texte autour) en utilisant les noms de tables indiques plus haut.
-- Pour compter les couchages ou les personnes, utilise SUM sur la colonne numerique appropriee (ex. `SUM(couchage)` ou `SUM(nbre_personne)`), pas un COUNT(*) tout seul.
-- Ne genere pas de SQL vide ou incoherent : la requete doit toujours contenir SELECT ... FROM ... et utiliser des colonnes existantes.
+- Si une table a plus de {preview_limit} lignes OU que la question demande une liste complete / un total / un comptage global (ex. "liste", "tous les", "total", "combien"), genere un bloc SQL complet (un seul bloc, pas de texte autour) en utilisant les noms de tables indiques plus haut.
+- Toujours indiquer la table cible dans le FROM (ex. `sheet_Feuil1`).
 
 Exemple de reponse SQL uniquement (si besoin de tout le fichier) :
 ```sql
@@ -205,12 +195,6 @@ Je vais intercepter ce code, l'executer sur toutes les lignes, puis te renvoyer 
             sql_query = sql_match.group(1).strip()
             print(f"[Excel Filter] DETECTED SQL: {sql_query}")
 
-            # Basic validation: must contain SELECT and FROM
-            if not re.search(r"\bselect\b", sql_query, re.IGNORECASE) or not re.search(r"\bfrom\b", sql_query, re.IGNORECASE):
-                messages[-1]["content"] += "\n\n⚠️ Requete SQL invalide (SELECT/FROM manquants). Reformule en incluant SELECT ... FROM table."
-                body["messages"] = messages
-                return body
-
             # Reuse session for this chat, or fall back to default if available
             conn = self.db_sessions.get(cid) or self.db_sessions.get("default")
             if conn is None:
@@ -221,15 +205,9 @@ Je vais intercepter ce code, l'executer sur toutes les lignes, puis te renvoyer 
                     df_res = pd.read_sql_query(sql_query, conn)
                     preview = df_res.head(200)
                     md = preview.to_markdown(index=False)
-                    # Remplace systematiquement la reponse du modele par une reponse naturelle
-                    if len(preview) == 1 and len(preview.columns) == 1:
-                        val = preview.iloc[0, 0]
-                        messages[-1]["content"] = f"Reponse : {val}."
-                    else:
-                        extra = ""
-                        if len(df_res) > len(preview):
-                            extra = f"\n\n(Apercu tronque a {len(preview)} lignes sur {len(df_res)})"
-                        messages[-1]["content"] = f"Reponse (premieres lignes) :\n\n{md}{extra}"
+                    messages[-1]["content"] += f"\n\nResultat SQL (premieres lignes):\n\n{md}"
+                    if len(df_res) > len(preview):
+                        messages[-1]["content"] += f"\n\n(Tronque a {len(preview)} lignes sur {len(df_res)})"
                     body["messages"] = messages
                 except Exception as e:
                     messages[-1]["content"] += f"\n\n⚠️ Erreur SQL: {e}"
@@ -237,23 +215,13 @@ Je vais intercepter ce code, l'executer sur toutes les lignes, puis te renvoyer 
 
         return body
 
-    def _generate_sheet_preview(
-        self,
-        df: pd.DataFrame,
-        sheet_name: str,
-        filename: str,
-        columns_sql: List[str],
-        total_rows: int,
-        preview_limit: int,
-    ) -> str:
-        """Generate a raw markdown preview of the sheet with columns info."""
+    def _generate_sheet_preview(self, df: pd.DataFrame, sheet_name: str, filename: str) -> str:
+        """Generate a raw markdown preview of the sheet."""
         df_display = df.fillna("")
         markdown_table = df_display.to_markdown(index=False)
-        cols = ", ".join(columns_sql)
         preview = f"""
 ## Fichier: {filename} | Feuille: {sheet_name}
-**Colonnes SQL:** {cols}
-**Apercu ({min(preview_limit, total_rows)} premieres lignes / {total_rows} lignes totales)** :
+**Apercu (20 premieres lignes brutes)** :
 {markdown_table}
 """
         return preview
