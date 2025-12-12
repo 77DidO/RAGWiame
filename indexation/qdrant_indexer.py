@@ -11,7 +11,10 @@ import typer
 from ingestion.cli import _load_config as load_ingestion_config
 from ingestion.config import IngestionConfig
 from ingestion.pipeline import IngestionPipeline
-from llm_pipeline.elastic_client import index_document as es_index_document
+from llm_pipeline.elastic_client import (
+    index_document as es_index_document,
+    delete_index as es_delete_index,
+)
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 # Import corrigé pour HuggingFaceEmbedding
 try:
@@ -24,6 +27,7 @@ except ImportError:
         from llama_index.core.embeddings import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams
 
 
 class QdrantIndexer:
@@ -87,12 +91,64 @@ def _build_es_body(chunk) -> dict:
 app = typer.Typer(add_completion=False)
 
 
+def _is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _purge_vector_and_keyword_stores(qdrant_url: str, collection_name: str) -> None:
+    """Supprime les donn'es existantes pour 'viter les doublons massifs."""
+    print(f"DEBUG: Purging Qdrant collection '{collection_name}'", flush=True)
+    client = QdrantClient(url=qdrant_url)
+    existing_vectors: VectorParams | dict[str, VectorParams] | None = None
+    try:
+        info = client.get_collection(collection_name)
+        existing_vectors = info.config.params.vectors
+    except Exception as exc:
+        print(f"DEBUG: Unable to read existing collection config: {exc}", flush=True)
+    try:
+        client.delete_collection(collection_name)
+        print(f"DEBUG: Qdrant collection '{collection_name}' deleted", flush=True)
+    except Exception as exc:
+        print(f"DEBUG: Unable to delete Qdrant collection '{collection_name}': {exc}", flush=True)
+    else:
+        # Recréer immédiatement la collection avec un vecteur nommé 'text-dense'
+        vectors_config: dict[str, VectorParams]
+        if isinstance(existing_vectors, dict):
+            vectors_config = existing_vectors
+        elif isinstance(existing_vectors, VectorParams):
+            vectors_config = {"text-dense": existing_vectors}
+        else:
+            vectors_config = {
+                "text-dense": VectorParams(size=384, distance=Distance.COSINE)
+            }
+        try:
+            client.recreate_collection(
+                collection_name,
+                vectors_config=vectors_config,
+                on_disk_payload=True,
+            )
+            print(f"DEBUG: Qdrant collection '{collection_name}' recreated", flush=True)
+        except Exception as exc:
+            print(f"DEBUG: Unable to recreate collection '{collection_name}': {exc}", flush=True)
+
+    print("DEBUG: Purging Elasticsearch BM25 index", flush=True)
+    es_delete_index()
+
+
 @app.command()
 def main(
     config_path: Optional[Path] = typer.Option(None, help="Chemin d'un fichier d'ingestion JSON"),
     qdrant_url: str = typer.Option("http://qdrant:6333", help="URL du service Qdrant"),
     collection_name: str = typer.Option("rag_documents", help="Nom de la collection Qdrant"),
     embedding_model: Optional[str] = typer.Option(None, help="Modèle d'embedding HuggingFace"),
+    purge: bool = typer.Option(
+        False,
+        "--purge",
+        is_flag=True,
+        help="Supprime les données existantes avant réindexation pour éviter les doublons.",
+    ),
 ) -> None:
     """Exécute l'ingestion puis indexe les documents dans Qdrant."""
     print("DEBUG: qdrant_indexer script started", flush=True)
@@ -103,6 +159,14 @@ def main(
     ingestion_config = IngestionConfig()
     if config_path:
         ingestion_config = load_ingestion_config(config_path)
+
+    purge_env = os.getenv("INDEXATION_PURGE")
+    if purge_env is not None:
+        purge = _is_truthy(purge_env)
+        print(f"DEBUG: INDEXATION_PURGE env detected -> purge={purge}", flush=True)
+
+    if purge:
+        _purge_vector_and_keyword_stores(qdrant_url, collection_name)
 
     pipeline = IngestionPipeline(ingestion_config)
     chunks = list(pipeline.run())
