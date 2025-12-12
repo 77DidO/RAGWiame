@@ -172,6 +172,12 @@ docker compose -f infra/docker-compose.yml run --rm indexation
 docker compose -f infra/docker-compose.yml run --rm insights   # extraction des totaux DQE
 docker compose -f infra/docker-compose.yml run --rm inventory  # inventaire des documents par projet
 ```
+   Pour repartir d'une base propre (suppression Qdrant + index BM25) :
+   ```powershell
+docker compose -f infra/docker-compose.yml build indexation
+docker compose -f infra/docker-compose.yml run --rm indexation -e INDEXATION_PURGE=true
+   ```
+   > Les arguments passés après le nom du service sont transmis au script Python exécuté par le conteneur.
 2. **Mini UI FastAPI**
    ```bash
    pip install -r upload_ui/requirements.txt

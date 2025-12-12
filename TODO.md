@@ -71,3 +71,5 @@
 - Les priorités 🔴 doivent être traitées avant de continuer le développement de nouvelles fonctionnalités
 - Le backlog 📋 contient les améliorations futures planifiées
  - [ ] Ajouter un mode "SQL forcé" pour le pipeline Excel (bloc SQL obligatoire, garde-fous bloc vide, preview plus longue pour guider le modèle).
+- [ ] Ajouter un mode "SQL force" pour le pipeline Excel (bloc SQL obligatoire, garde-fous bloc vide, preview plus longue pour guider le modele).
+- [ ] Finaliser integration du pipeline Data Interpreter IA (excel-extension) : dependances DuckDB/LLM, valves, DB_FILE/HISTORY_DB_FILE, test de chargement et execution.
