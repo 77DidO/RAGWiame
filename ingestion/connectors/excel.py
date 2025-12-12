@@ -6,6 +6,7 @@ from typing import Iterable
 
 from ingestion.config import ConnectorConfig, ExcelConnectorOptions
 from ingestion.connectors.base import BaseConnector, DocumentChunk
+from ingestion.metadata_utils import extract_ao_metadata, should_exclude_path
 
 try:
     import pandas as pd
@@ -24,10 +25,16 @@ class ExcelConnector(BaseConnector):
         self.options = options
 
     def discover(self) -> Iterable[Path]:
+        patterns = ("*.xls", "*.xlsx")
         for path in self.config.paths:
             if path.is_dir():
-                yield from path.rglob("*.xlsx") if self.config.recursive else path.glob("*.xlsx")
-            elif path.suffix.lower() in {".xls", ".xlsx"}:
+                for pattern in patterns:
+                    iterator = path.rglob(pattern) if self.config.recursive else path.glob(pattern)
+                    for candidate in iterator:
+                        if should_exclude_path(candidate, self.config):
+                            continue
+                        yield candidate
+            elif path.suffix.lower() in {".xls", ".xlsx"} and not should_exclude_path(path, self.config):
                 yield path
 
     def load(self, path: Path) -> Iterable[DocumentChunk]:
@@ -82,6 +89,7 @@ class ExcelConnector(BaseConnector):
                         # Ajouter le total de section si détecté
                         if section.get("total"):
                             metadata["section_total"] = section["total"]
+                        metadata.update(extract_ao_metadata(path))
                         
                         yield DocumentChunk(
                             id=f"{path.stem}-{sheet_name}-section{chunk_idx}",
@@ -112,6 +120,7 @@ class ExcelConnector(BaseConnector):
                             "start_row": start_row + 1,
                             "end_row": end_row,
                         }
+                        metadata.update(extract_ao_metadata(path))
                         yield DocumentChunk(
                             id=f"{path.stem}-{sheet_name}-chunk{chunk_idx}",
                             text=chunk_text,

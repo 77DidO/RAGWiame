@@ -6,6 +6,7 @@ from typing import Iterable
 
 from ingestion.config import ConnectorConfig
 from ingestion.connectors.base import BaseConnector, DocumentChunk
+from ingestion.metadata_utils import extract_ao_metadata, should_exclude_path
 
 
 class TextConnector(BaseConnector):
@@ -21,12 +22,16 @@ class TextConnector(BaseConnector):
     def discover(self) -> Iterable[Path]:
         for path in self.config.paths:
             if path.is_dir():
-                yield from path.rglob("*.txt") if self.config.recursive else path.glob("*.txt")
-            elif path.suffix.lower() == ".txt":
+                iterator = path.rglob("*.txt") if self.config.recursive else path.glob("*.txt")
+                for candidate in iterator:
+                    if should_exclude_path(candidate, self.config):
+                        continue
+                    yield candidate
+            elif path.suffix.lower() == ".txt" and not should_exclude_path(path, self.config):
                 yield path
 
     def load(self, path: Path) -> Iterable[DocumentChunk]:
-        # Lecture robuste des fichiers texte : on essaie UTF‑8 puis un fallback latin‑1
+        # Lecture robuste des fichiers texte : on essaie UTF-8 puis un fallback latin-1
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -41,6 +46,7 @@ class TextConnector(BaseConnector):
                 "chunk_index": index,
                 "document_type": self.document_type,
             }
+            metadata.update(extract_ao_metadata(path))
             yield DocumentChunk(id=f"{path.stem}-{index}", text=chunk_text, metadata=metadata)
             position += self.chunk_size - self.chunk_overlap
             index += 1

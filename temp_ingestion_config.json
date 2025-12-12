@@ -1,0 +1,8 @@
+{
+  "txt": {"enabled": true, "paths": ["/data"], "recursive": true},
+  "docx": {"enabled": true, "paths": ["/data"], "recursive": true},
+  "pdf": {"enabled": false},
+  "excel": {"enabled": false},
+  "mariadb_source": {"enabled": false}
+}
+

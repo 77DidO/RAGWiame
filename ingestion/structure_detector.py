@@ -30,6 +30,13 @@ class StructureDetector:
         normalized = re.sub(r"\s+", " ", paragraph.strip())
         if not normalized:
             return None
+
+        # Titres Markdown (## Section) -> on isole directement la section
+        if normalized.startswith("#"):
+            heading = normalized.lstrip("#").strip(" :")
+            if heading:
+                return heading
+
         upper = normalized.upper()
         
         # 1. Mots-clés exacts

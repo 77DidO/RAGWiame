@@ -33,6 +33,7 @@ class ConnectorConfig:
     recursive: bool = True
     credentials: SourceCredentials = field(default_factory=SourceCredentials)
     extra: Dict[str, str] = field(default_factory=dict)
+    excluded_extensions: List[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
