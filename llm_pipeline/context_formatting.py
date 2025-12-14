@@ -101,11 +101,35 @@ def format_context(
             citation_idx_map[source] = len(citation_idx_map) + 1
         citation_num = citation_idx_map[source]
         
-        # Build header: [1] or [1] (Page X)
-        header = f"[{citation_num}]"
+        # Build header: [1] (Source: ... | Date: ... | Type: ...)
+        header_parts = []
+        
+        # 1. Source (Nom fichier)
+        clean_source = source.split("/")[-1] if "/" in source else source
+        header_parts.append(f"Source: {clean_source}")
+        
+        # 2. Page (si dispo)
         page = metadata.get("page")
         if page is not None:
-            header += f" (Page {page})"
+            header_parts.append(f"Page: {page}")
+        
+        # 3. Métadonnées riches (enrichies par MetadataEnricher ou AO)
+        # Date
+        date_str = metadata.get("date") or metadata.get("creation_date")
+        if date_str:
+             header_parts.append(f"Date: {date_str.split('T')[0]}") # Keep only YYYY-MM-DD
+             
+        # Type detected
+        doc_type = metadata.get("doc_hint") or metadata.get("ao_doc_role") or metadata.get("content_type_detected")
+        if doc_type:
+            header_parts.append(f"Type: {doc_type}")
+            
+        # Project / Client
+        project = metadata.get("project_names") or metadata.get("ao_id")
+        if project:
+            header_parts.append(f"Projet: {project}")
+            
+        header = f"[{citation_num}] ({' | '.join(header_parts)})"
             
         # Select relevant text
         snippet = _select_relevant_text(text, keywords, max_chunk_chars)
