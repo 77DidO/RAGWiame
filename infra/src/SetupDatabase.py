@@ -45,7 +45,8 @@ def setup_logger(
     backup_count=5,
 ):
     # Créer le répertoire de logs s'il n'existe pas
-    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Logs")
+    # Create log directory in a writable volume
+    log_dir = "/app/backend/data/Logs"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 

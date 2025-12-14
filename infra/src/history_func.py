@@ -28,8 +28,8 @@ def setup_logger(
     max_size=5 * 1024 * 1024,
     backup_count=3,
 ):
-    # Create log directory if it doesn't exist
-    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Logs")
+    # Create log directory in a writable volume
+    log_dir = "/app/backend/data/Logs"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
