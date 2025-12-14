@@ -97,3 +97,29 @@ Pour chaque document important, s’assurer que les champs suivants sont renseig
 - **Date + version** (AAAA-MM-JJ + suffixe V1/V2 ou horodatage de signature).
 
 Objectif : activer des filtres/boosts fiables et guider l’utilisateur vers des requêtes précises (moins de « recherche floue »).
+
+### 6.1 Sources d’extraction/pré-remplissage
+
+- **Structure AO** : dossier `AO/<ID - Commune - Objet>/...` ⇒ `code_affaire`, `commune`, `lot/objet`.
+- **Nom de fichier** : patterns `2025-11_facture_V2.pdf`, `DOE_ED258025_V1.docx`, `DICT_Lille_TRAM.pdf` ⇒ `date`, `type`, `version`.
+- **Props document** : DOCX (core props), PDF (metadata si présentes), XLSX (feuille “INFO”/premières lignes).
+- **Tags UI / saisie opérateur** : champs fournis lors de l’upload (si UI supportée) pour forcer/écraser.
+
+### 6.2 Normalisation minimale
+
+- Dates au format `AAAA-MM-JJ` (ou `AAAA-MM` si jour inconnu) + suffixe `V1`, `V2` quand applicable.
+- Type dans une liste contrôlée : `plan`, `DOE`, `DICT`, `devis`, `facture`, `CR`, `photo` (sinon `type=autre`).
+- Lot/disciplines dans une liste courte (VRD, assainissement, CFO, CFA, structure, voirie...).
+- Commune/site : nettoyer majuscules, accents, trim.
+
+### 6.3 Validation (bloquante)
+
+- Refuser l’ingestion d’un fichier « important » si `code_affaire` ou `type` manquent.
+- Logger en WARN les champs manquants non bloquants (ex. `version`) avec le chemin du fichier.
+- En cas d’incertitude, marquer `metadata_confidence=low` et laisser passer avec un flag.
+
+### 6.4 Propagation vers les index
+
+- Qdrant : champs stockés dans `payload` (`code_affaire`, `client`, `commune`, `type`, `lot`, `date`, `version`).
+- Elasticsearch : mêmes champs dans le document BM25 pour filtres/boost.
+- Reranker : ces métadonnées servent aux boosts/pénalités (type/lot/tag vs absences).
