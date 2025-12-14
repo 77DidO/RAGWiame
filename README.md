@@ -18,6 +18,18 @@ Plateforme RAG open source orientée francophonie. Ce dépôt fournit un kit com
 - Python 3.11 (utilisé par `scripts/start.py` pour orchestrer bootstrap et déploiement).
 - Accès GPU recommandé pour vLLM (CUDA 12+). En CPU, attendez-vous à des temps de réponse plus longs.
 
+## Installation du projet
+
+Ce projet contient l'interface utilisateur (Open WebUI) sous forme de **sous-module Git**. Il est impératif de cloner le dépôt de manière récursive pour récupérer à la fois l'infrastructure et l'interface personnalisée.
+
+```bash
+# Clone complet (Backend + Frontend custom)
+git clone --recursive https://github.com/77DidO/RAGWiame.git
+
+# Si vous avez déjà cloné sans l'option --recursive :
+git submodule update --init --recursive
+```
+
 ## Démarrage rapide
 
 ### Option 1 : Scripts PowerShell (Recommandé pour Windows)
