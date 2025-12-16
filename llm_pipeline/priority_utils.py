@@ -1,5 +1,8 @@
+from typing import List
+from llm_pipeline.retrieval import node_id
 
 OFFICIAL_CODES = {"RC", "CCTP", "CCAP", "AE", "BPU", "DE", "MEMOIRE"}
+
 
 def _is_official_doc(node) -> bool:
     """Renvoie True si le document est considéré comme une source officielle (DCE, BPU, etc)."""
