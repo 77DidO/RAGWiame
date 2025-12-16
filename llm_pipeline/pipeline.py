@@ -242,14 +242,19 @@ class RagPipeline:
     def _build_metadata_filters(self, filters: Mapping[str, str]) -> MetadataFilters | None:
         if not filters:
             return None
-        must = []
+        
+        from llama_index.core.vector_stores.types import MetadataFilter, FilterOperator
+        
+        filters_list = []
         for key, value in filters.items():
             if not value:
                 continue
-            must.append({"key": key, "match": {"value": value}})
-        if not must:
+            filters_list.append(MetadataFilter(key=key, value=value, operator=FilterOperator.EQ))
+            
+        if not filters_list:
             return None
-        return {"must": must}
+            
+        return MetadataFilters(filters=filters_list)
 
     def _merge_metadata_filters(
         self, base: MetadataFilters | None, router_filters: Mapping[str, str]
@@ -260,19 +265,19 @@ class RagPipeline:
         if not router_metadata:
             return base
 
-        merged: Dict[str, List[Mapping[str, str]]] = {}
-        for key in ("must", "should", "must_not"):
-            base_list = base.get(key, []) if base else []
-            router_list = router_metadata.get(key, []) if router_metadata else []
-            combined = list(base_list) + list(router_list)
-            if combined:
-                merged[key] = combined
-
-        if not merged and base:
-            return base
-        if not merged:
-            return None
-        return merged
+        # Fusion des deux objets MetadataFilters
+        # On suppose que base contient une liste de filtres dans base.filters
+        base_filters = list(base.filters) if base.filters else []
+        new_filters = list(router_metadata.filters) if router_metadata.filters else []
+        
+        # On évite les doublons (clé/valeur identiques)
+        existing_keys = {(f.key, f.value) for f in base_filters}
+        
+        for f in new_filters:
+            if (f.key, f.value) not in existing_keys:
+                base_filters.append(f)
+                
+        return MetadataFilters(filters=base_filters, condition=base.condition)
 
     def chat_only(self, messages: List[ChatMessage] | str) -> str:
         print(f"DEBUG: chat_only called", flush=True)
