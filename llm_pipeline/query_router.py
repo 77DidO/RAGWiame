@@ -6,10 +6,24 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional
 
-# On utilise les définitions officielles de l'ingestion pour être aligné
-from ingestion.metadata_utils import DOC_ROLE_PATTERNS
+# from ingestion.metadata_utils import DOC_ROLE_PATTERNS
 from llm_pipeline.prompts import get_router_prompt
 from llama_index.core.prompts import PromptTemplate
+
+
+# Copie locale de ingestion.metadata_utils pour éviter les problèmes d'import circulaires/docker
+# DOIT ETRE GARDE EN SYNC AVEC ingestion/metadata_utils.py
+DOC_ROLE_PATTERNS: Mapping[str, Iterable[str]] = {
+    "BPU": ("bpu", "bordereau des prix"),
+    "DE": ("detail estimatif", "détail estimatif", "de "),
+    "AE": ("acte d'engagement", "ae "),
+    "RC": ("reglement de consultation", "règlement de consultation", "rc "),
+    "CCAP": ("ccap",),
+    "CCTP": ("cctp",),
+    "PLANNING": ("planning",),
+    "MEMOIRE": ("memoire technique", "mémoire technique"),
+    "PRESENTATION": ("presentation de l'entreprise", "présentation de l'entreprise"),
+}
 
 
 @dataclass(slots=True)
