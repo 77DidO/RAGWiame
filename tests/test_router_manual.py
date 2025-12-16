@@ -48,5 +48,15 @@ def test_router():
         res_full = router.analyze(q, llm=llm)
         print(f"  -> Full Router: {res_full.filters} (Conf: {res_full.confidence:.2f})")
 
+    # Cas 4 : Question générique sur AO (Doit retourner tous les codes officiels)
+    print("\n--- Test 4 : Question générique 'Infos sur AO ED258239' ---")
+    res4 = router.analyze("Donne moi les infos sur l'AO ED258239")
+    print(f"Intent: {res4.intent}")
+    print(f"Filters: {res4.filters}")
+    if "ao_doc_code" in res4.filters and isinstance(res4.filters["ao_doc_code"], list):
+        print("✅ SUCCESS: Liste de codes documents injectée par défaut.")
+    else:
+        print("❌ FAILURE: Pas de liste de codes documents par défaut.")
+
 if __name__ == "__main__":
     test_router()

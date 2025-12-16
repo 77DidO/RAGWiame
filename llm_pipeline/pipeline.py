@@ -249,7 +249,11 @@ class RagPipeline:
         for key, value in filters.items():
             if not value:
                 continue
-            filters_list.append(MetadataFilter(key=key, value=value, operator=FilterOperator.EQ))
+            
+            if isinstance(value, (list, tuple)):
+                filters_list.append(MetadataFilter(key=key, value=value, operator=FilterOperator.IN))
+            else:
+                filters_list.append(MetadataFilter(key=key, value=value, operator=FilterOperator.EQ))
             
         if not filters_list:
             return None

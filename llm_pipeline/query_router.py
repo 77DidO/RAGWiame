@@ -141,7 +141,16 @@ class QueryRouter:
             except Exception as e:
                 print(f"Warning: LLM router failed: {e}")
 
-        # --- 3. Intention ---
+        # --- 3. Default Filtering for Generic AO Queries ---
+        # Si on a un AO_ID mais PAS de type de document spécifique, on restreint aux documents structurants (DCE)
+        # pour éviter de pollué la réponse avec des fichiers de travail (Excel divers, mails...).
+        if "ao_id" in filters and "ao_doc_code" not in filters:
+            # On liste tous les codes officiels connus
+            official_codes = list(self.DOC_KEYWORD_TO_CODE.values())
+            # On déduplique
+            filters["ao_doc_code"] = list(set(official_codes))
+
+        # --- 4. Intention ---
         intent = self._resolve_intent(lower, filters)
         confidence = self._estimate_confidence(filters)
         
