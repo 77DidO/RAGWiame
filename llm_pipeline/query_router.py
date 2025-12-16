@@ -145,10 +145,15 @@ class QueryRouter:
         # Si on a un AO_ID mais PAS de type de document spécifique, on restreint aux documents structurants (DCE)
         # pour éviter de pollué la réponse avec des fichiers de travail (Excel divers, mails...).
         if "ao_id" in filters and "ao_doc_code" not in filters:
-            # On liste tous les codes officiels connus
-            official_codes = list(self.DOC_KEYWORD_TO_CODE.values())
-            # On déduplique
-            filters["ao_doc_code"] = list(set(official_codes))
+            # On liste tous les codes officiels mais on exclut les pièces purement chiffrées (BPU, DE)
+            # pour privilégier les documents textuels (CCTP, RC, CCAP) lors d'une vue d'ensemble.
+            all_official = list(set(self.DOC_KEYWORD_TO_CODE.values()))
+            filters["ao_doc_code"] = [
+                code for code in all_official 
+                if code not in ("BPU", "DE") 
+                and code not in ("PLANNING",) # On peut exclure planning aussi si peu pertinent
+            ]
+
 
         # --- 4. Intention ---
         intent = self._resolve_intent(lower, filters)
