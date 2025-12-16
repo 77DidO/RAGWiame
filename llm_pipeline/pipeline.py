@@ -275,10 +275,14 @@ class RagPipeline:
         new_filters = list(router_metadata.filters) if router_metadata.filters else []
         
         # On évite les doublons (clé/valeur identiques)
-        existing_keys = {(f.key, f.value) for f in base_filters}
+        existing_keys = set()
+        for f in base_filters:
+            val = tuple(f.value) if isinstance(f.value, list) else f.value
+            existing_keys.add((f.key, val))
         
         for f in new_filters:
-            if (f.key, f.value) not in existing_keys:
+            val = tuple(f.value) if isinstance(f.value, list) else f.value
+            if (f.key, val) not in existing_keys:
                 base_filters.append(f)
                 
         return MetadataFilters(filters=base_filters, condition=base.condition)
