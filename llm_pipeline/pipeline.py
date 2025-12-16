@@ -31,6 +31,7 @@ from llm_pipeline.context_formatting import format_context, _extract_node_text
 from llm_pipeline.retrieval import hybrid_query as pipeline_hybrid_query, node_id
 from llm_pipeline.text_utils import tokenize, citation_key
 from llm_pipeline.reranker import CrossEncoderReranker
+from llm_pipeline.priority_utils import _prioritize_official_docs
 
 
 @dataclass(slots=True)
@@ -195,7 +196,6 @@ class RagPipeline:
         relevant_nodes = [node for node in reranked if hasattr(node, 'score') and node.score >= MIN_RELEVANCE_SCORE]
         
         print(f"DEBUG: {len(relevant_nodes)}/{len(reranked)} nodes passed threshold {MIN_RELEVANCE_SCORE}", flush=True)
-        
         if not relevant_nodes:
             return RagQueryResult(
                 answer="Je n'ai pas trouvé de documents suffisamment pertinents pour répondre à cette question. "
@@ -203,6 +203,9 @@ class RagPipeline:
                 citations=[],
                 hits=hits,
             )
+
+        # Priorisation finale : On remonte les docs officiels (DCE, BPU...) en haut de la pile
+        relevant_nodes = _prioritize_official_docs(relevant_nodes)
 
         context_text, snippet_map = format_context(
             relevant_nodes,

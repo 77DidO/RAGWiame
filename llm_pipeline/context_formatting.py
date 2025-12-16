@@ -110,24 +110,20 @@ def format_context(
         
         # 2. Page (si dispo)
         page = metadata.get("page")
-        if page is not None:
-            header_parts.append(f"Page: {page}")
-        
-        # 3. Métadonnées riches (enrichies par MetadataEnricher ou AO)
-        
-        # AO Context (Crucial pour la désambiguïsation)
-        ao_id = metadata.get("ao_id")
-        ao_commune = metadata.get("ao_commune")
-        if ao_id or ao_commune:
-            parts = []
-            if ao_id: parts.append(f"AO {ao_id}")
-            if ao_commune: parts.append(f"{ao_commune}")
-            header_parts.append(" | ".join(parts))
-
-        # Phase / Section
+        # Phase / Section (Dossier parent)
         phase = metadata.get("ao_phase_label") or metadata.get("ao_phase_code")
-        if phase:
-            header_parts.append(f"Phase: {phase}")
+        section = metadata.get("ao_section")
+        
+        phase_str = f"Phase: {phase}" if phase else ""
+        section_str = f"Dossier: {section}" if section else ""
+        
+        # On combine proprement
+        if phase and section:
+            header_parts.append(f"{phase_str} ({section_str})")
+        elif phase:
+            header_parts.append(phase_str)
+        elif section:
+            header_parts.append(section_str)
 
         # Type de document spécifique
         doc_type = metadata.get("ao_doc_code") or metadata.get("doc_hint") or metadata.get("ao_doc_role") or metadata.get("content_type_detected")
