@@ -15,6 +15,7 @@ from sentence_transformers import CrossEncoder
 
 from llm_pipeline.elastic_client import bm25_search
 from llm_pipeline.query_classification import classify_query_type
+from llm_pipeline.query_router import QueryRouter
 from llm_pipeline.prompts import (
     get_default_prompt,
     get_chat_prompt,
@@ -59,6 +60,7 @@ class RagPipeline:
         enable_reranker: bool = True,
     ) -> None:
         self.index = index
+        self.query_router = QueryRouter()
         self.top_k = top_k
         self.max_chunk_chars = max_chunk_chars
         self.initial_top_k = max(top_k * 3, top_k + 2)
@@ -131,6 +133,16 @@ class RagPipeline:
         question_lower = question.lower().strip()
         print(f"DEBUG: Checking vague question: '{question_lower}'", flush=True)
         question_type = classify_query_type(question_lower)
+        
+        # Passage du LLM au router pour l'extraction intelligente si besoin
+        router_result = self.query_router.analyze(question, llm=self.llm)
+        
+        metadata_filters = self._merge_metadata_filters(filters, router_result.filters)
+        print(
+            f"DEBUG: QueryRouter intent={router_result.intent} filters={router_result.filters} "
+            f"confidence={router_result.confidence:.2f}",
+            flush=True,
+        )
         print(f"DEBUG: Detected question type: {question_type}", flush=True)
         
         for pattern in vague_patterns:
@@ -147,12 +159,12 @@ class RagPipeline:
 
         hits: Optional[List[Dict[str, Any]]] = None
         if use_hybrid:
-            nodes, hits = pipeline_hybrid_query(self, question, filters=filters)
+            nodes, hits = pipeline_hybrid_query(self, question, filters=metadata_filters)
             query_text = question
             if return_hits_only:
                 return RagQueryResult(answer="", citations=[], hits=hits)
         else:
-            retriever = self.index.as_retriever(similarity_top_k=self.initial_top_k, filters=filters)
+            retriever = self.index.as_retriever(similarity_top_k=self.initial_top_k, filters=metadata_filters)
             query_bundle = QueryBundle(question)
             nodes = retriever.retrieve(query_bundle)
             query_text = query_bundle.query_str
@@ -226,6 +238,41 @@ class RagPipeline:
                 }
             )
         return RagQueryResult(answer=str(response), citations=citations, hits=hits)
+
+    def _build_metadata_filters(self, filters: Mapping[str, str]) -> MetadataFilters | None:
+        if not filters:
+            return None
+        must = []
+        for key, value in filters.items():
+            if not value:
+                continue
+            must.append({"key": key, "match": {"value": value}})
+        if not must:
+            return None
+        return {"must": must}
+
+    def _merge_metadata_filters(
+        self, base: MetadataFilters | None, router_filters: Mapping[str, str]
+    ) -> MetadataFilters | None:
+        router_metadata = self._build_metadata_filters(router_filters)
+        if not base:
+            return router_metadata
+        if not router_metadata:
+            return base
+
+        merged: Dict[str, List[Mapping[str, str]]] = {}
+        for key in ("must", "should", "must_not"):
+            base_list = base.get(key, []) if base else []
+            router_list = router_metadata.get(key, []) if router_metadata else []
+            combined = list(base_list) + list(router_list)
+            if combined:
+                merged[key] = combined
+
+        if not merged and base:
+            return base
+        if not merged:
+            return None
+        return merged
 
     def chat_only(self, messages: List[ChatMessage] | str) -> str:
         print(f"DEBUG: chat_only called", flush=True)

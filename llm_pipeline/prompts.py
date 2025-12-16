@@ -170,3 +170,33 @@ __all__ = [
     "get_chat_prompt",
     "PROMPT_TEMPLATES",
 ]
+
+
+def get_router_prompt() -> str:
+    """Prompt to extract AO metadata from a question (JSON output)."""
+    return """[INST] Tu es un expert en analyse de demandes liées aux Appels d'Offres (AO).
+Ta mission est d'extraire les filtres de métadonnées d'une question utilisateur pour interroger une base vectorielle.
+
+Champs possibles à extraire (JSON) :
+- "ao_id": Identifiant de l'AO (ex: "ED25123")
+- "ao_commune": Nom de la commune ou ville (ex: "Paris", "Lyon")
+- "ao_doc_code": Type de document précis. Valeurs autorisées : "BPU", "DQE", "CCTP", "CCAP", "RC" (Règlement Consultation), "AE" (Acte d'Engagement), "PLANNING", "MEMOIRE".
+- "ao_phase_label": Phase du projet. Valeurs autorisées : "Candidature", "Offre".
+- "ao_signed": "true" si l'utilisateur cherche une version signée.
+
+Consignes :
+1. Analyse la question pour détecter ces entités.
+2. Normalise les valeurs (MAJUSCULES pour commune et ID).
+3. Retourne UNIQUEMENT un objet JSON valide. Pas de texte avant ou après.
+4. Si aucun filtre n'est détecté, retourne un JSON vide {}.
+
+Exemples :
+Question : "Je veux le BPU pour la mairie de Bordeaux"
+JSON : {"ao_doc_code": "BPU", "ao_commune": "BORDEAUX"}
+
+Question : "Montre moi le CCTP phase candidature de l'affaire ED4500"
+JSON : {"ao_doc_code": "CCTP", "ao_phase_label": "Candidature", "ao_id": "ED4500"}
+
+Question : {question} [/INST]
+JSON :"""
+
