@@ -114,22 +114,38 @@ def format_context(
             header_parts.append(f"Page: {page}")
         
         # 3. Métadonnées riches (enrichies par MetadataEnricher ou AO)
-        # Date
-        date_str = metadata.get("date") or metadata.get("creation_date")
-        if date_str:
-             header_parts.append(f"Date: {date_str.split('T')[0]}") # Keep only YYYY-MM-DD
-             
-        # Type detected
-        doc_type = metadata.get("doc_hint") or metadata.get("ao_doc_role") or metadata.get("content_type_detected")
+        
+        # AO Context (Crucial pour la désambiguïsation)
+        ao_id = metadata.get("ao_id")
+        ao_commune = metadata.get("ao_commune")
+        if ao_id or ao_commune:
+            parts = []
+            if ao_id: parts.append(f"AO {ao_id}")
+            if ao_commune: parts.append(f"{ao_commune}")
+            header_parts.append(" | ".join(parts))
+
+        # Phase / Section
+        phase = metadata.get("ao_phase_label") or metadata.get("ao_phase_code")
+        if phase:
+            header_parts.append(f"Phase: {phase}")
+
+        # Type de document spécifique
+        doc_type = metadata.get("ao_doc_code") or metadata.get("doc_hint") or metadata.get("ao_doc_role") or metadata.get("content_type_detected")
         if doc_type:
             header_parts.append(f"Type: {doc_type}")
             
-        # Project / Client
-        project = metadata.get("project_names") or metadata.get("ao_id")
-        if project:
-            header_parts.append(f"Projet: {project}")
+        # Statut Signature
+        signed = metadata.get("ao_signed")
+        if signed: # signed peut être True ou "true" (str)
+            label = metadata.get("ao_signature_label", "")
+            header_parts.append(f"✅ SIGNE ({label})" if label else "✅ SIGNE")
+
+        # Date
+        date_str = metadata.get("date") or metadata.get("creation_date")
+        if date_str:
+             header_parts.append(f"Date: {date_str.split('T')[0]}")
             
-        header = f"[{citation_num}] ({' | '.join(header_parts)})"
+        header = f"[{citation_num}] 📄 {' | '.join(header_parts)}"
             
         # Select relevant text
         snippet = _select_relevant_text(text, keywords, max_chunk_chars)
