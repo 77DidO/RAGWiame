@@ -129,6 +129,7 @@ REGLES :
 - Remplace les pronoms (il, elle, son, sa...) par les noms auxquels ils font reference dans l'historique
 - Garde la question en francais
 - Ne reponds PAS a la question, reformule-la seulement
+- Ne transforme JAMAIS "AO" en "Avion" ou autre chose. "AO" = Appel d'Offres.
 - Si la question est deja claire, recopie-la telle quelle
 
 Historique de la conversation :
